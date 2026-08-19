@@ -1,0 +1,16 @@
+{
+  "name": "pulse",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": { "node": ">=22.13.0" },
+  "scripts": {
+    "dev:web": "npm run dev -w @pulse/web",
+    "dev:mobile": "npm run start -w @pulse/mobile",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:generate": "npm run db:generate -w @pulse/db",
+    "db:migrate": "npm run db:migrate -w @pulse/db"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@pulse/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": { "@pulse/domain": "*" },
+  "scripts": { "typecheck": "tsc --noEmit" },
+  "devDependencies": { "typescript": "^6.0.3" }
+}
