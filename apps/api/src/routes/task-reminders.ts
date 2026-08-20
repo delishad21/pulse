@@ -1,0 +1,3 @@
+import { z } from "zod"; import { getUser } from "../lib/auth.js"; import { parseBody,parseParams,ISOInstantSchema } from "../lib/validation.js"; import * as s from "../services/reminder-service.js"; import type { FastifyInstance } from "fastify";
+const P=z.object({taskId:z.string().min(1)}); const Create=z.object({remindAt:ISOInstantSchema,channel:z.string().min(1).max(30).optional()});
+export default async function routes(app:FastifyInstance){app.get("/",async(r,p)=>{const u=getUser(r);const {taskId}=parseParams(P,r.params);p.send(await s.listReminders(u.id,taskId));});app.post("/",async(r,p)=>{const u=getUser(r);const {taskId}=parseParams(P,r.params);p.status(201).send(await s.createReminder(u.id,taskId,parseBody(Create,r.body)));});}

@@ -1,0 +1,1 @@
+import { getUser } from "../lib/auth.js"; import * as s from "../services/event-service.js"; import type { FastifyInstance } from "fastify"; export default async function routes(app:FastifyInstance){app.get("/",async(r,p)=>{const u=getUser(r);p.send(await s.listActivity(u.id));});}

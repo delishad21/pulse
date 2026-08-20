@@ -9,7 +9,11 @@
     "test": "node --experimental-strip-types --test src/*.test.ts"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/node": "^20.19.43",
     "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "fastify": "^5.12.1"
   }
 }

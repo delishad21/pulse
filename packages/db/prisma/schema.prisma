@@ -10,38 +10,118 @@ datasource db {
 enum TaskStatus {
   OPEN
   COMPLETED
+  CANCELLED
+}
+enum Priority {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+  COMPLETED
+}
+enum OperationKind {
+  TASK_CREATE
+  TASK_UPDATE
+  TASK_DELETE
+  TASK_COMPLETE
+  TASK_REOPEN
+  TASK_BULK_UPDATE
+  TASK_BULK_COMPLETE
+  TASK_BULK_DELETE
+  TASK_BULK_MOVE
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  tasks     Task[]
-  tags      Tag[]
+  id         String      @id @default(cuid())
+  email      String      @unique
+  name       String?
+  timezone   String      @default("UTC")
+  tasks      Task[]
+  projects   Project[]
+  tags       Tag[]
+  comments   Comment[]
   operations Operation[]
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  reminders  Reminder[]
+  events     TaskEvent[]
+  filters    Filter[]
+  createdAt  DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime    @updatedAt @db.Timestamptz(3)
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  color       String?
+  icon        String?
+  status      ProjectStatus @default(ACTIVE)
+  sortOrder   Int           @default(0)
+  sections    Section[]
+  tasks       Task[]
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @db.Timestamptz(3)
+  archivedAt  DateTime?     @db.Timestamptz(3)
+  deletedAt   DateTime?     @db.Timestamptz(3)
+
+  @@index([userId, status, deletedAt, sortOrder])
+}
+
+model Section {
+  id        String    @id @default(cuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  sortOrder Int       @default(0)
+  tasks     Task[]
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3)
+
+  @@index([projectId, deletedAt, sortOrder])
 }
 
 model Task {
-  id          String     @id @default(cuid())
-  userId      String
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  status      TaskStatus @default(OPEN)
-  dueDate     DateTime?  @db.Date
-  dueAt       DateTime?  @db.Timestamptz(3)
-  reminderAt  DateTime?  @db.Timestamptz(3)
-  completedAt DateTime?  @db.Timestamptz(3)
-  deletedAt   DateTime?  @db.Timestamptz(3)
-  revision    Int        @default(0)
-  tags        TaskTag[]
-  createdAt   DateTime   @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime   @updatedAt @db.Timestamptz(3)
+  id             String      @id @default(cuid())
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId      String?
+  project        Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  sectionId      String?
+  section        Section?    @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  parentTaskId   String?
+  parentTask     Task?       @relation("Subtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subtasks       Task[]      @relation("Subtasks")
+  title          String
+  description    String?
+  status         TaskStatus  @default(OPEN)
+  priority       Priority    @default(NONE)
+  dueDate        DateTime?   @db.Date
+  dueAt          DateTime?   @db.Timestamptz(3)
+  reminderAt     DateTime?   @db.Timestamptz(3)
+  recurrenceRule String?
+  completedAt    DateTime?   @db.Timestamptz(3)
+  deletedAt      DateTime?   @db.Timestamptz(3)
+  sortOrder      Int         @default(0)
+  revision       Int         @default(0)
+  tags           TaskTag[]
+  comments       Comment[]
+  reminders      Reminder[]
+  operations     Operation[]
+  events         TaskEvent[]
+  createdAt      DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @db.Timestamptz(3)
 
   @@index([userId, status, dueDate])
+  @@index([userId, status, dueAt])
   @@index([userId, deletedAt])
+  @@index([userId, projectId, sectionId, sortOrder])
 }
 
 model Tag {
@@ -49,10 +129,14 @@ model Tag {
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
+  color     String?
   tasks     TaskTag[]
   createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3)
 
   @@unique([userId, name])
+  @@index([userId, deletedAt])
 }
 
 model TaskTag {
@@ -64,14 +148,73 @@ model TaskTag {
   @@id([taskId, tagId])
 }
 
-model Operation {
+model Comment {
+  id        String    @id @default(cuid())
+  taskId    String
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body      String
+  deletedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@index([taskId, deletedAt, createdAt])
+}
+
+model Reminder {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId    String
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  remindAt  DateTime  @db.Timestamptz(3)
+  channel   String    @default("push")
+  status    String    @default("pending")
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3)
+
+  @@index([userId, remindAt, status, deletedAt])
+  @@index([taskId, deletedAt])
+}
+
+model TaskEvent {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   kind      String
-  payload   Json
-  undoneAt  DateTime? @db.Timestamptz(3)
+  payload   Json?
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([userId, createdAt])
+  @@index([taskId, createdAt])
+}
+
+model Operation {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId    String?
+  task      Task?         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  kind      OperationKind
+  payload   Json
+  undoneAt  DateTime?     @db.Timestamptz(3)
+  createdAt DateTime      @default(now()) @db.Timestamptz(3)
+
+  @@index([userId, createdAt])
+}
+
+model Filter {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  query     Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([userId, name])
 }

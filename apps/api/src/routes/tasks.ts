@@ -1,0 +1,40 @@
+import { z } from "zod";
+import { getUser } from "../lib/auth.js";
+import { parseBody, parseParams, PrioritySchema, ISODateSchema, ISOInstantSchema } from "../lib/validation.js";
+import * as taskService from "../services/task-service.js";
+import * as operationService from "../services/operation-service.js";
+import * as eventService from "../services/event-service.js";
+import type { BulkUpdateInput, UpdateTaskInput } from "@pulse/api-client";
+import type { FastifyInstance } from "fastify";
+
+const IdParam=z.object({id:z.string().min(1)}); const Recurrence=z.string().max(1000).nullable().optional();
+const CreateTaskSchema=z.object({title:z.string().min(1).max(500),description:z.string().max(10000).nullable().optional(),priority:PrioritySchema.optional(),dueDate:ISODateSchema.nullable().optional(),dueAt:ISOInstantSchema.nullable().optional(),reminderAt:ISOInstantSchema.nullable().optional(),recurrenceRule:Recurrence,projectId:z.string().nullable().optional(),sectionId:z.string().nullable().optional(),parentTaskId:z.string().nullable().optional(),tagIds:z.array(z.string()).optional()});
+const UpdateTaskSchema=CreateTaskSchema.partial();
+const BulkIds=z.object({ids:z.array(z.string()).min(1).max(1000)});
+const BulkUpdate=BulkIds.extend({title:z.string().min(1).max(500).optional(),priority:PrioritySchema.optional(),dueDate:ISODateSchema.nullable().optional(),dueAt:ISOInstantSchema.nullable().optional(),reminderAt:ISOInstantSchema.nullable().optional(),recurrenceRule:Recurrence,projectId:z.string().nullable().optional(),sectionId:z.string().nullable().optional(),addTagIds:z.array(z.string()).optional(),removeTagIds:z.array(z.string()).optional()});
+const MoveSchema=z.object({projectId:z.string().nullable(),sectionId:z.string().nullable().optional()});
+const ScheduleSchema=z.object({dueDate:ISODateSchema.nullable().optional(),dueAt:ISOInstantSchema.nullable().optional(),reminderAt:ISOInstantSchema.nullable().optional(),recurrenceRule:Recurrence});
+const LabelsSchema=z.object({tagIds:z.array(z.string())});
+
+async function snapshotAndUpdate(userId:string,id:string,input:UpdateTaskInput,kind:string){const snap=await operationService.captureSnapshot(userId,id);const task=await taskService.updateTask(userId,id,input);await operationService.recordOperation(userId,"TASK_UPDATE",snap,id);await eventService.recordEvent(userId,id,kind,input);return task;}
+
+export default async function taskRoutes(app:FastifyInstance):Promise<void>{
+  app.get("/",async(req,reply)=>{const u=getUser(req);reply.send(await taskService.listTasks(u.id,req.query as Record<string,string>));});
+  app.post("/",async(req,reply)=>{const u=getUser(req);const input=parseBody<typeof CreateTaskSchema._type>(CreateTaskSchema,req.body);const task=await taskService.createTask(u.id,input);await operationService.recordOperation(u.id,"TASK_CREATE",{taskId:task.id},task.id);await eventService.recordEvent(u.id,task.id,"task.created",input);reply.status(201).send(task);});
+
+  app.post("/bulk/complete",async(req,reply)=>{const u=getUser(req);const {ids}=parseBody<{ids:string[]}>(BulkIds,req.body);const snapshots=await operationService.captureSnapshots(u.id,ids);const tasks=await taskService.bulkComplete(u.id,ids);await operationService.recordOperation(u.id,"TASK_BULK_COMPLETE",{snapshots});await Promise.all(ids.map((id)=>eventService.recordEvent(u.id,id,"task.completed")));reply.send(tasks);});
+  app.post("/bulk/delete",async(req,reply)=>{const u=getUser(req);const {ids}=parseBody<{ids:string[]}>(BulkIds,req.body);const snapshots=await operationService.captureSnapshots(u.id,ids);await taskService.bulkDelete(u.id,ids);await operationService.recordOperation(u.id,"TASK_BULK_DELETE",{snapshots});await Promise.all(ids.map((id)=>eventService.recordEvent(u.id,id,"task.deleted")));reply.status(204).send();});
+  app.post("/bulk/update",async(req,reply)=>{const u=getUser(req);const input=parseBody<BulkUpdateInput>(BulkUpdate,req.body);const snapshots=await operationService.captureSnapshots(u.id,input.ids);const tasks=await taskService.bulkUpdate(u.id,input);await operationService.recordOperation(u.id,"TASK_BULK_UPDATE",{snapshots});await Promise.all(input.ids.map((id)=>eventService.recordEvent(u.id,id,"task.updated",input)));reply.send(tasks);});
+  app.post("/bulk/move",async(req,reply)=>{const u=getUser(req);const input=parseBody<{ids:string[];projectId:string|null;sectionId?:string|null}>(BulkIds.merge(MoveSchema),req.body);const snapshots=await operationService.captureSnapshots(u.id,input.ids);const tasks=await taskService.bulkUpdate(u.id,input);await operationService.recordOperation(u.id,"TASK_BULK_MOVE",{snapshots});await Promise.all(input.ids.map((id)=>eventService.recordEvent(u.id,id,"task.moved",input)));reply.send(tasks);});
+  app.post("/bulk/reschedule",async(req,reply)=>{const u=getUser(req);const input=parseBody<BulkUpdateInput>(BulkIds.merge(ScheduleSchema),req.body);const snapshots=await operationService.captureSnapshots(u.id,input.ids);const tasks=await taskService.bulkUpdate(u.id,input);await operationService.recordOperation(u.id,"TASK_BULK_UPDATE",{snapshots});await Promise.all(input.ids.map((id)=>eventService.recordEvent(u.id,id,"task.rescheduled",input)));reply.send(tasks);});
+
+  app.get("/:id",async(req,reply)=>{const u=getUser(req);const {id}=parseParams(IdParam,req.params);reply.send(await taskService.getTask(u.id,id));});
+  app.patch("/:id",async(req,reply)=>{const u=getUser(req);const {id}=parseParams(IdParam,req.params);const input=parseBody<UpdateTaskInput>(UpdateTaskSchema,req.body);reply.send(await snapshotAndUpdate(u.id,id,input,"task.updated"));});
+  app.delete("/:id",async(req,reply)=>{const u=getUser(req);const {id}=parseParams(IdParam,req.params);const snap=await operationService.captureSnapshot(u.id,id);await taskService.deleteTask(u.id,id);await operationService.recordOperation(u.id,"TASK_DELETE",snap,id);await eventService.recordEvent(u.id,id,"task.deleted");reply.status(204).send();});
+  app.post("/:id/complete",async(req,reply)=>{const u=getUser(req);const {id}=parseParams(IdParam,req.params);const snap=await operationService.captureSnapshot(u.id,id);const task=await taskService.completeTask(u.id,id);await operationService.recordOperation(u.id,"TASK_COMPLETE",snap,id);await eventService.recordEvent(u.id,id,"task.completed");reply.send(task);});
+  app.post("/:id/reopen",async(req,reply)=>{const u=getUser(req);const {id}=parseParams(IdParam,req.params);const snap=await operationService.captureSnapshot(u.id,id);const task=await taskService.reopenTask(u.id,id);await operationService.recordOperation(u.id,"TASK_REOPEN",snap,id);await eventService.recordEvent(u.id,id,"task.reopened");reply.send(task);});
+  app.post("/:id/cancel",async(req,reply)=>{const u=getUser(req);const {id}=parseParams(IdParam,req.params);const snap=await operationService.captureSnapshot(u.id,id);const task=await taskService.cancelTask(u.id,id);await operationService.recordOperation(u.id,"TASK_UPDATE",snap,id);await eventService.recordEvent(u.id,id,"task.cancelled");reply.send(task);});
+  app.post("/:id/move",async(req,reply)=>{const u=getUser(req);const {id}=parseParams(IdParam,req.params);const input=parseBody<UpdateTaskInput>(MoveSchema,req.body);reply.send(await snapshotAndUpdate(u.id,id,input,"task.moved"));});
+  app.post("/:id/reschedule",async(req,reply)=>{const u=getUser(req);const {id}=parseParams(IdParam,req.params);const input=parseBody<UpdateTaskInput>(ScheduleSchema,req.body);reply.send(await snapshotAndUpdate(u.id,id,input,"task.rescheduled"));});
+  app.post("/:id/labels",async(req,reply)=>{const u=getUser(req);const {id}=parseParams(IdParam,req.params);const {tagIds}=parseBody<{tagIds:string[]}>(LabelsSchema,req.body);reply.send(await snapshotAndUpdate(u.id,id,{tagIds},"task.labels_changed"));});
+}
