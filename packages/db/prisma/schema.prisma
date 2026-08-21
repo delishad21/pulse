@@ -41,6 +41,7 @@ model User {
   email      String      @unique
   name       String?
   timezone   String      @default("UTC")
+  passwordHash String?
   tasks      Task[]
   projects   Project[]
   tags       Tag[]

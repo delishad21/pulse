@@ -37,6 +37,11 @@ export async function buildApp(options: ServerOptions = {}) {
   await registerAuth(app, defaultUser, options.auth ?? {
     webToken: process.env.PULSE_WEB_TOKEN,
     serviceToken: process.env.PULSE_SERVICE_TOKEN,
+    resolveUser: async (id) => {
+      const { prisma } = await import("@pulse/db");
+      const user = await prisma.user.findUnique({ where: { id } });
+      return user ? { id: user.id, email: user.email, name: user.name, timezone: user.timezone } : null;
+    },
   });
   await registerErrorHandler(app);
   await registerRoutes(app);

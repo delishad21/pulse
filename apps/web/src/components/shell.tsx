@@ -12,6 +12,7 @@ import {
   Inbox,
   LayoutDashboard,
   Menu,
+  LogOut,
   Plus,
   Search,
   Settings,
@@ -22,6 +23,7 @@ import { ThemeToggle } from "./theme-toggle";
 import { CommandPalette } from "./command-palette";
 import { useProjects } from "@/hooks/use-projects";
 import { cn } from "@/lib/utils";
+import { signOut, useSession } from "next-auth/react";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
 const taskNav: NavItem[] = [
@@ -70,6 +72,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const waitingForGo = useRef(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: projects } = useProjects();
+  const { data: session } = useSession();
 
   const focusQuickAdd = useCallback(() => {
     const quickAdd = document.getElementById("quick-add") as HTMLInputElement | null;
@@ -180,7 +183,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <div className="mt-4 border-t border-stroke pt-4">
+      <div className="mt-4 space-y-2 border-t border-stroke pt-4">
         <button
           type="button"
           onClick={openCommandPalette}
@@ -190,6 +193,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <span>Command palette</span>
           <span className="ml-auto rounded border border-stroke bg-surface-subtle px-1.5 py-0.5 text-[10px] font-semibold text-muted">⌘K</span>
         </button>
+        {session?.user ? (
+          <div className="flex items-center gap-2 rounded-lg bg-surface-subtle px-3 py-2">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-ink">{session.user.name || session.user.email}</p>
+              <p className="truncate text-[11px] text-muted">{session.user.email}</p>
+            </div>
+            <button type="button" onClick={() => signOut({ callbackUrl: "/login" })} aria-label="Sign out" className="flex size-8 items-center justify-center rounded-md text-muted hover:bg-surface hover:text-danger">
+              <LogOut className="size-4" />
+            </button>
+          </div>
+        ) : null}
       </div>
     </aside>
   );

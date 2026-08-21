@@ -35,30 +35,33 @@ test("health endpoints are reachable", async () => {
   }
 });
 
-test("production auth accepts web/service tokens and rejects missing or invalid credentials", async () => {
+test("production auth binds web requests to a resolved user while service auth keeps the default identity", async () => {
   const repository = createMemoryRepository(TEST_USER.id);
   const app = await buildApp({
     repository,
     defaultUser: TEST_USER,
-    auth: { webToken: "web-secret", serviceToken: "service-secret" },
+    auth: {
+      webToken: "web-secret",
+      serviceToken: "service-secret",
+      resolveUser: async (id) => id === TEST_USER.id ? TEST_USER : null,
+    },
   });
   const baseUrl = await app.listen({ port: 0 });
   try {
-    const health = await fetch(`${baseUrl}/api/health/live`);
-    assert.equal(health.status, 200);
+    assert.equal((await fetch(`${baseUrl}/api/health/live`)).status, 200);
+    assert.equal((await fetch(`${baseUrl}/api/tasks`)).status, 401);
+    assert.equal((await fetch(`${baseUrl}/api/tasks`, { headers: { Authorization: "Bearer wrong-secret" } })).status, 401);
 
-    const missing = await fetch(`${baseUrl}/api/tasks`);
-    assert.equal(missing.status, 401);
-    const invalid = await fetch(`${baseUrl}/api/tasks`, {
-      headers: { Authorization: "Bearer wrong-secret" },
-    });
-    assert.equal(invalid.status, 401);
+    const webWithoutIdentity = await fetch(`${baseUrl}/api/tasks`, { headers: { Authorization: "Bearer web-secret" } });
+    assert.equal(webWithoutIdentity.status, 401);
+    const webUnknownIdentity = await fetch(`${baseUrl}/api/tasks`, { headers: { Authorization: "Bearer web-secret", "x-pulse-user-id": "unknown" } });
+    assert.equal(webUnknownIdentity.status, 401);
+    const web = await fetch(`${baseUrl}/api/tasks`, { headers: { Authorization: "Bearer web-secret", "x-pulse-user-id": TEST_USER.id } });
+    assert.equal(web.status, 200);
+    assert.deepEqual(await web.json(), []);
 
-    for (const token of ["web-secret", "service-secret"]) {
-      const client = new PulseApiClient({ baseUrl, getAccessToken: async () => token });
-      const tasks = await client.listTasks();
-      assert.deepEqual(tasks, []);
-    }
+    const serviceClient = new PulseApiClient({ baseUrl, getAccessToken: async () => "service-secret" });
+    assert.deepEqual(await serviceClient.listTasks(), []);
   } finally {
     await app.close();
     clearRepository();

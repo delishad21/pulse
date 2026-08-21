@@ -14,6 +14,7 @@ export interface AuthOptions {
   webToken?: string;
   serviceToken?: string;
   requireAuth?: boolean;
+  resolveUser?: (id: string) => Promise<RequestUser | null>;
 }
 
 declare module "fastify" {
@@ -41,29 +42,31 @@ export async function registerAuth(
   options: AuthOptions = {},
 ): Promise<void> {
   const requireAuth = options.requireAuth ?? Boolean(options.webToken || options.serviceToken);
-  app.decorateRequest("user", {
-    getter() {
-      return defaultUser;
-    },
-    setter() {
-      // The current single-user backend keeps request identity immutable.
-    },
-  });
-
+  app.decorateRequest("user", null as unknown as RequestUser);
   app.addHook("onRequest", async (request) => {
+    request.user = defaultUser;
     if (request.url.startsWith("/api/health")) return;
     if (!requireAuth) return;
 
     const token = bearerToken(request);
     if (!token) throw Errors.Unauthorized();
-    if (tokenMatches(token, options.webToken)) return;
     if (tokenMatches(token, options.serviceToken)) return;
+
+    if (tokenMatches(token, options.webToken)) {
+      const raw = request.headers["x-pulse-user-id"];
+      const userId = Array.isArray(raw) ? raw[0] : raw;
+      if (!userId || !options.resolveUser) throw Errors.Unauthorized();
+      const user = await options.resolveUser(userId);
+      if (!user) throw Errors.Unauthorized();
+      request.user = user;
+      return;
+    }
+
     throw Errors.Unauthorized();
   });
 }
 
 export function getUser(request: FastifyRequest): RequestUser {
-  const user = request.user;
-  if (!user) throw new Error("User not attached to request");
-  return user;
+  if (!request.user) throw new Error("User not attached to request");
+  return request.user;
 }

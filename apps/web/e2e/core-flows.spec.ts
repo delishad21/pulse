@@ -1,5 +1,20 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill("e2e-auth@pulse.local");
+  await page.getByLabel("Password").fill("pulse-e2e-password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/inbox$/);
+});
+
+test("authenticated session can sign out and protected pages redirect to login", async ({ page }) => {
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/login/);
+  await page.goto("/today");
+  await expect(page).toHaveURL(/\/login/);
+});
+
 test("quick add, edit, complete/reopen, comment, and command palette", async ({ page }) => {
   await page.goto("/inbox");
   const quickAdd = page.getByLabel("Quick add task");
