@@ -12,10 +12,20 @@
     "rootDir": ".",
     "outDir": "./dist",
     "paths": {
-      "@pulse/db": ["../packages/db/src/index.ts"],
-      "@pulse/domain": ["../packages/domain/src/index.ts"],
-      "@pulse/api-client": ["../packages/api-client/src/index.ts"]
+      "@pulse/db": [
+        "../packages/db/src/index.ts"
+      ],
+      "@pulse/domain": [
+        "../packages/domain/src/index.ts"
+      ],
+      "@pulse/api-client": [
+        "../packages/api-client/src/index.ts"
+      ]
     }
   },
-  "include": ["src/**/*", "tests/**/*"]
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+    "scripts/**/*"
+  ]
 }
