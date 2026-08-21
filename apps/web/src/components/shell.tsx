@@ -2,29 +2,88 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  CalendarDays,
+  CalendarRange,
+  CheckCircle2,
+  CircleCheckBig,
+  Command,
+  Inbox,
+  LayoutDashboard,
+  Menu,
+  Plus,
+  Search,
+  Settings,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { CommandPalette } from "./command-palette";
+import { useProjects } from "@/hooks/use-projects";
 import { cn } from "@/lib/utils";
 
-const navItems = [
-  { href: "/", label: "Dashboard" },
-  { href: "/inbox", label: "Inbox" },
-  { href: "/today", label: "Today" },
-  { href: "/upcoming", label: "Upcoming" },
-  { href: "/projects", label: "Projects" },
-  { href: "/filters", label: "Filters" },
-  { href: "/completed", label: "Completed" },
-  { href: "/search", label: "Search" },
-  { href: "/settings", label: "Settings" },
+type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
+const taskNav: NavItem[] = [
+  { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/inbox", label: "Inbox", icon: Inbox },
+  { href: "/today", label: "Today", icon: CalendarDays },
+  { href: "/upcoming", label: "Upcoming", icon: CalendarRange },
+  { href: "/completed", label: "Completed", icon: CheckCircle2 },
 ];
+
+const toolNav: NavItem[] = [
+  { href: "/filters", label: "Filters", icon: SlidersHorizontal },
+  { href: "/search", label: "Search", icon: Search },
+  { href: "/settings", label: "Settings", icon: Settings },
+];
+
+function isRouteActive(pathname: string, href: string) {
+  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+}
+
+function NavLink({ item, pathname, onNavigate }: { item: NavItem; pathname: string; onNavigate?: () => void }) {
+  const active = isRouteActive(pathname, item.href);
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "group relative flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+        active
+          ? "bg-primary-soft text-primary"
+          : "text-muted hover:bg-surface-subtle hover:text-ink dark:hover:bg-surface-subtle",
+      )}
+    >
+      <Icon className="size-[18px] shrink-0" />
+      <span className="truncate">{item.label}</span>
+      {active ? <span className="absolute right-0 h-6 w-1 rounded-l-full bg-primary" /> : null}
+    </Link>
+  );
+}
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const waitingForGo = useRef(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { data: projects } = useProjects();
 
+  const focusQuickAdd = useCallback(() => {
+    const quickAdd = document.getElementById("quick-add") as HTMLInputElement | null;
+    if (quickAdd) {
+      quickAdd.focus();
+      return;
+    }
+    router.push("/inbox");
+    setTimeout(() => (document.getElementById("quick-add") as HTMLInputElement | null)?.focus(), 150);
+  }, [router]);
+
+  const openCommandPalette = () => {
+    window.dispatchEvent(new Event("pulse:command-palette"));
+  };
   useEffect(() => {
     let goTimer: ReturnType<typeof setTimeout> | undefined;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -46,13 +105,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
       if (key === "g") {
         waitingForGo.current = true;
         goTimer = setTimeout(() => { waitingForGo.current = false; }, 800);
-        return;
-      }
-      if (key === "q") {
+      } else if (key === "q") {
         event.preventDefault();
-        const quickAdd = document.getElementById("quick-add") as HTMLInputElement | null;
-        if (quickAdd) quickAdd.focus();
-        else router.push("/inbox");
+        focusQuickAdd();
       } else if (key === "/") {
         event.preventDefault();
         router.push("/search");
@@ -60,77 +115,133 @@ export function Shell({ children }: { children: React.ReactNode }) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => { window.removeEventListener("keydown", onKeyDown); if (goTimer) clearTimeout(goTimer); };
-  }, [router]);
+  }, [router, focusQuickAdd]);
+  const sidebar = (
+    <aside className="flex h-full w-[286px] flex-col border-r border-stroke bg-surface px-4 py-5 dark:border-stroke">
+      <div className="flex items-center gap-3 px-2">
+        <div className="flex size-11 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
+          <CircleCheckBig className="size-6" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-lg font-extrabold tracking-tight text-ink">Pulse</p>
+          <p className="text-xs font-medium text-muted">Tasks, everywhere.</p>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={focusQuickAdd}
+        className="mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+      >
+        <Plus className="size-4" />
+        Add task
+      </button>
+
+      <div className="pulse-scrollbar mt-6 flex-1 overflow-y-auto pr-1">
+        <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-soft">Tasks</p>
+        <nav className="space-y-1" aria-label="Task navigation">
+          {taskNav.map((item) => <NavLink key={item.href} item={item} pathname={pathname} onNavigate={() => setMobileOpen(false)} />)}
+        </nav>
+        <div className="mt-7">
+          <div className="mb-2 flex items-center justify-between px-3">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-soft">Projects</p>
+            <Link href="/projects" className="rounded p-1 text-muted transition hover:bg-surface-subtle hover:text-ink" aria-label="Manage projects">
+              <Plus className="size-3.5" />
+            </Link>
+          </div>
+          <nav className="space-y-1" aria-label="Project navigation">
+            {projects?.slice(0, 12).map((project) => {
+              const href = `/projects/${project.id}`;
+              const active = pathname.startsWith(href);
+              return (
+                <Link
+                  key={project.id}
+                  href={href}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "group relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+                    active ? "bg-primary-soft text-primary" : "text-muted hover:bg-surface-subtle hover:text-ink",
+                  )}
+                >
+                  <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: project.color ?? "#dc4c3e" }} />
+                  <span className="truncate">{project.name}</span>
+                  {active ? <span className="absolute right-0 h-5 w-1 rounded-l-full bg-primary" /> : null}
+                </Link>
+              );
+            })}
+            {!projects?.length ? <p className="px-3 py-2 text-xs text-muted">No projects yet</p> : null}
+          </nav>
+        </div>
+        <div className="mt-7">
+          <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-soft">Tools</p>
+          <nav className="space-y-1" aria-label="Tools">
+            {toolNav.map((item) => <NavLink key={item.href} item={item} pathname={pathname} onNavigate={() => setMobileOpen(false)} />)}
+          </nav>
+        </div>
+      </div>
+
+      <div className="mt-4 border-t border-stroke pt-4">
+        <button
+          type="button"
+          onClick={openCommandPalette}
+          className="flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted transition hover:bg-surface-subtle hover:text-ink"
+        >
+          <Command className="size-[18px]" />
+          <span>Command palette</span>
+          <span className="ml-auto rounded border border-stroke bg-surface-subtle px-1.5 py-0.5 text-[10px] font-semibold text-muted">⌘K</span>
+        </button>
+      </div>
+    </aside>
+  );
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
-      {/* Mobile header */}
-      <header className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 md:hidden dark:border-zinc-800">
-        <Link href="/" className="text-lg font-semibold">
-          Pulse
-        </Link>
-        <button
-          type="button"
-          onClick={() => setMobileOpen((open) => !open)}
-          aria-expanded={mobileOpen}
-          aria-label="Toggle navigation"
-          className="rounded-md p-2 text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-        >
-          {mobileOpen ? "Close" : "Menu"}
-        </button>
-      </header>
+    <div className="flex h-screen overflow-hidden bg-canvas">
+      <div className="hidden shrink-0 md:block">{sidebar}</div>
+      {mobileOpen ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close navigation"
+            onClick={() => setMobileOpen(false)}
+            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[1px] md:hidden"
+          />
+          <div className="fixed inset-y-0 left-0 z-50 md:hidden">{sidebar}</div>
+        </>
+      ) : null}
 
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-20 w-64 transform border-r border-zinc-200 bg-zinc-50 p-4 transition-transform md:static md:translate-x-0 dark:border-zinc-800 dark:bg-zinc-900",
-          mobileOpen ? "translate-x-0" : "-translate-x-full",
-        )}
-      >
-        <div className="mb-6 flex items-center justify-between">
-          <Link href="/" className="text-xl font-semibold tracking-tight">
-            Pulse
-          </Link>
-          <ThemeToggle />
-        </div>
-        <nav className="space-y-1">
-          {navItems.map((item) => {
-            const active =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "block rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-zinc-200 text-zinc-950 dark:bg-zinc-800 dark:text-zinc-50"
-                    : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800",
-                )}
-                aria-current={active ? "page" : undefined}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </aside>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex h-[72px] shrink-0 items-center justify-between border-b border-stroke bg-surface/95 px-4 backdrop-blur md:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setMobileOpen((open) => !open)}
+              aria-label="Toggle navigation"
+              className="flex size-10 items-center justify-center rounded-lg border border-stroke text-muted transition hover:bg-surface-subtle hover:text-ink md:hidden"
+            >
+              {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+            </button>
+            <div className="md:hidden">
+              <p className="font-bold text-ink">Pulse</p>
+              <p className="text-[11px] text-muted">Your task workspace</p>
+            </div>
+          </div>
 
-      {/* Backdrop */}
-      {mobileOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-10 bg-black/25 md:hidden"
-          onClick={() => setMobileOpen(false)}
-          aria-label="Close navigation"
-        />
-      )}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={openCommandPalette}
+              className="hidden h-10 items-center gap-2 rounded-lg border border-stroke bg-surface-subtle px-3 text-sm text-muted transition hover:border-primary/30 hover:text-ink sm:flex"
+            >
+              <Search className="size-4" />
+              <span className="hidden lg:inline">Search anything</span>
+              <span className="rounded border border-stroke bg-surface px-1.5 py-0.5 text-[10px] font-semibold">⌘K</span>
+            </button>
+            <ThemeToggle compact />
+          </div>
+        </header>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-auto p-4 md:p-8">{children}</main>
+        <main className="pulse-scrollbar min-h-0 flex-1 overflow-y-auto">{children}</main>
+      </div>
       <CommandPalette />
     </div>
   );

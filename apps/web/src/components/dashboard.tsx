@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CalendarClock, Check, FolderInput, RotateCcw, RotateCw, Trash2, X } from "lucide-react";
 import { useTasks, useTaskView, useTaskSearch, useBulkTasks, useBulkMoveTasks, useBulkRescheduleTasks } from "@/hooks/use-tasks";
 import { useProjects, useSections } from "@/hooks/use-projects";
 import { useUndo, useRedo, useHistory } from "@/hooks/use-history";
@@ -95,39 +96,49 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
 
   return (
     <Shell>
-      <div className="mx-auto max-w-3xl">
-        {header}
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {project ? project.name : title}
-            </h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              {filtered.length} task{filtered.length === 1 ? "" : "s"}
+      <div className="mx-auto w-full max-w-[980px] px-4 py-8 md:px-8 md:py-10">
+        <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <h1 className="truncate text-[30px] font-bold leading-tight tracking-[-0.03em] text-ink">
+                {project ? project.name : title}
+              </h1>
+              <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">
+                {filtered.length}
+              </span>
+            </div>
+            <p className="mt-1 text-sm font-medium text-muted">
+              {filtered.length === 0 ? "Nothing demanding your attention." : `${filtered.length} task${filtered.length === 1 ? "" : "s"} in this view`}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-1 rounded-lg border border-stroke bg-surface p-1 shadow-sm">
             <button
               type="button"
               onClick={() => undo.mutate()}
               disabled={!history?.some((operation) => !operation.undoneAt) || undo.isPending}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              className="flex size-9 items-center justify-center rounded-md text-muted transition hover:bg-surface-subtle hover:text-ink disabled:cursor-not-allowed disabled:opacity-35"
+              aria-label="Undo"
+              title="Undo"
             >
-              Undo
+              <RotateCcw className="size-4" />
             </button>
             <button
               type="button"
               onClick={() => redo.mutate()}
               disabled={!history?.some((operation) => operation.undoneAt) || redo.isPending}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              className="flex size-9 items-center justify-center rounded-md text-muted transition hover:bg-surface-subtle hover:text-ink disabled:cursor-not-allowed disabled:opacity-35"
+              aria-label="Redo"
+              title="Redo"
             >
-              Redo
+              <RotateCw className="size-4" />
             </button>
-            {history?.length ? <span className="text-xs text-zinc-400">{history.length} recent operations</span> : null}
           </div>
         </div>
 
-        <div className="mb-6">
+        {header ? <div className="mb-5">{header}</div> : null}
+
+        <div className="mb-5">
           <QuickAdd
             projectId={
               filter.type === "project"
@@ -140,81 +151,61 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
         </div>
 
         {selectedIds.length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-800 dark:bg-zinc-900">
-            <span className="px-2 text-sm font-medium">
-              {selectedIds.length} selected
-            </span>
-            <button
-              type="button"
-              onClick={() => runBulk("complete")}
-              className="rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-zinc-200 dark:hover:bg-zinc-800"
-            >
-              Complete
+          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-primary-soft p-2.5 shadow-sm">
+            <span className="px-2 text-sm font-semibold text-primary">{selectedIds.length} selected</span>
+            <button type="button" onClick={() => runBulk("complete")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary/90">
+              <Check className="size-4" /> Complete
             </button>
-            <button
-              type="button"
-              onClick={() => runBulk("delete")}
-              className="rounded-md px-2.5 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/30"
-            >
-              Delete
+            <button type="button" onClick={() => runBulk("delete")} className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-danger hover:bg-white/70 dark:hover:bg-surface">
+              <Trash2 className="size-4" /> Delete
             </button>
-            <div className="flex items-center gap-1 rounded-md border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-950">
+
+            <div className="flex min-w-[230px] items-center gap-1 rounded-lg border border-primary/15 bg-surface p-1">
+              <FolderInput className="ml-2 size-4 text-muted" />
               <select
                 aria-label="Move selected tasks to project"
                 value={moveProjectId}
                 onChange={(event) => { setMoveProjectId(event.target.value); setMoveSectionId(""); }}
-                className="bg-transparent px-1 text-sm outline-none"
+                className="min-w-0 flex-1 bg-transparent px-1 text-sm text-ink outline-none"
               >
                 <option value="">Inbox</option>
                 {projects?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </select>
               {moveProjectId && moveSections?.length ? (
-                <select
-                  aria-label="Move selected tasks to section"
-                  value={moveSectionId}
-                  onChange={(event) => setMoveSectionId(event.target.value)}
-                  className="bg-transparent px-1 text-sm outline-none"
-                >
+                <select aria-label="Move selected tasks to section" value={moveSectionId} onChange={(event) => setMoveSectionId(event.target.value)} className="min-w-0 bg-transparent px-1 text-sm text-ink outline-none">
                   <option value="">No section</option>
                   {moveSections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
                 </select>
               ) : null}
-              <button type="button" onClick={runBulkMove} className="rounded px-2 py-1 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800">Move</button>
+              <button type="button" onClick={runBulkMove} className="rounded-md px-2 py-1.5 text-xs font-bold text-primary hover:bg-primary-soft">Move</button>
             </div>
-            <div className="flex items-center gap-1 rounded-md border border-zinc-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-950">
-              <input
-                type="date"
-                aria-label="Reschedule selected tasks"
-                value={bulkDueDate}
-                onChange={(event) => setBulkDueDate(event.target.value)}
-                className="bg-transparent px-1 text-sm outline-none"
-              />
-              <button type="button" onClick={runBulkReschedule} className="rounded px-2 py-1 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                {bulkDueDate ? "Reschedule" : "Clear due"}
-              </button>
+
+            <div className="flex items-center gap-1 rounded-lg border border-primary/15 bg-surface p-1">
+              <CalendarClock className="ml-2 size-4 text-muted" />
+              <input type="date" aria-label="Reschedule selected tasks" value={bulkDueDate} onChange={(event) => setBulkDueDate(event.target.value)} className="bg-transparent px-1 text-sm text-ink outline-none" />
+              <button type="button" onClick={runBulkReschedule} className="rounded-md px-2 py-1.5 text-xs font-bold text-primary hover:bg-primary-soft">{bulkDueDate ? "Reschedule" : "Clear due"}</button>
             </div>
-            <button
-              type="button"
-              onClick={() => setSelectedIds([])}
-              className="ml-auto rounded-md px-2.5 py-1.5 text-sm font-medium text-zinc-500 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
-            >
-              Clear
+
+            <button type="button" onClick={() => setSelectedIds([])} className="ml-auto flex size-9 items-center justify-center rounded-lg text-primary hover:bg-white/70 dark:hover:bg-surface" aria-label="Clear selection">
+              <X className="size-4" />
             </button>
           </div>
         )}
 
-        {isLoading ? (
-          <p className="py-8 text-center text-zinc-500 dark:text-zinc-400">
-            Loading…
-          </p>
-        ) : (
-          <TaskList
-            tasks={filtered}
-            selectedIds={selectedIds}
-            onSelect={toggleSelect}
-            reorderable={filter.type === "project"}
-          />
-        )}
+        <section className="overflow-hidden rounded-xl border border-stroke bg-surface shadow-card">
+          {isLoading ? (
+            <div className="space-y-0 divide-y divide-stroke">
+              {[0, 1, 2, 3].map((item) => (
+                <div key={item} className="flex items-center gap-3 px-5 py-4">
+                  <div className="size-5 animate-pulse rounded-full bg-surface-subtle" />
+                  <div className="h-4 w-1/3 animate-pulse rounded bg-surface-subtle" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <TaskList tasks={filtered} selectedIds={selectedIds} onSelect={toggleSelect} reorderable={filter.type === "project"} />
+          )}
+        </section>
       </div>
     </Shell>
   );

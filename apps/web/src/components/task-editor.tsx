@@ -98,7 +98,7 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
         <input
           id={`title-${task.id}`}
           {...form.register("title")}
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-stroke dark:bg-surface"
           placeholder="Task title"
         />
         {form.formState.errors.title && (
@@ -116,7 +116,7 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
           id={`description-${task.id}`}
           {...form.register("description")}
           rows={2}
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-stroke dark:bg-surface"
           placeholder="Description"
         />
       </div>
@@ -125,7 +125,7 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
         <div>
           <label
             htmlFor={`dueDate-${task.id}`}
-            className="block text-xs font-medium text-zinc-600 dark:text-zinc-400"
+            className="block text-xs font-medium text-muted dark:text-muted-soft"
           >
             Due date
           </label>
@@ -133,13 +133,13 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
             id={`dueDate-${task.id}`}
             type="date"
             {...form.register("dueDate")}
-            className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-stroke dark:bg-surface"
           />
         </div>
         <div>
           <label
             htmlFor={`dueAt-${task.id}`}
-            className="block text-xs font-medium text-zinc-600 dark:text-zinc-400"
+            className="block text-xs font-medium text-muted dark:text-muted-soft"
           >
             Due time (optional)
           </label>
@@ -147,26 +147,26 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
             id={`dueAt-${task.id}`}
             type="datetime-local"
             {...form.register("dueAt")}
-            className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-stroke dark:bg-surface"
           />
         </div>
       </div>
 
       <div>
-        <label htmlFor={`recurrence-${task.id}`} className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Recurrence rule</label>
+        <label htmlFor={`recurrence-${task.id}`} className="block text-xs font-medium text-muted dark:text-muted-soft">Recurrence rule</label>
         <input
           id={`recurrence-${task.id}`}
           {...form.register("recurrenceRule")}
           placeholder="FREQ=WEEKLY;INTERVAL=1"
-          className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+          className="mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-stroke dark:bg-surface"
         />
-        <p className="mt-1 text-xs text-zinc-400">RRULE format; leave blank for a non-recurring task.</p>
+        <p className="mt-1 text-xs text-muted-soft">RRULE format; leave blank for a non-recurring task.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor={`priority-${task.id}`} className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Priority</label>
-          <select id={`priority-${task.id}`} {...form.register("priority")} className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900">
+          <label htmlFor={`priority-${task.id}`} className="block text-xs font-medium text-muted dark:text-muted-soft">Priority</label>
+          <select id={`priority-${task.id}`} {...form.register("priority")} className="mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-stroke dark:bg-surface">
             <option value="none">None</option>
             <option value="low">Low</option>
             <option value="medium">Medium</option>
@@ -175,8 +175,8 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
           </select>
         </div>
         <div>
-          <label htmlFor={`labels-${task.id}`} className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Labels</label>
-          <select id={`labels-${task.id}`} multiple {...form.register("tagIds")} className="mt-1 h-24 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900">
+          <label htmlFor={`labels-${task.id}`} className="block text-xs font-medium text-muted dark:text-muted-soft">Labels</label>
+          <select id={`labels-${task.id}`} multiple {...form.register("tagIds")} className="mt-1 h-24 w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-stroke dark:bg-surface">
             {tags?.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
           </select>
         </div>
@@ -186,14 +186,14 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
         <div>
           <label
             htmlFor={`project-${task.id}`}
-            className="block text-xs font-medium text-zinc-600 dark:text-zinc-400"
+            className="block text-xs font-medium text-muted dark:text-muted-soft"
           >
             Project
           </label>
           <select
             id={`project-${task.id}`}
             {...form.register("projectId")}
-            className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-stroke dark:bg-surface"
           >
             <option value="">No project</option>
             {projects?.map((project) => (
@@ -206,7 +206,7 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
         <div>
           <label
             htmlFor={`section-${task.id}`}
-            className="block text-xs font-medium text-zinc-600 dark:text-zinc-400"
+            className="block text-xs font-medium text-muted dark:text-muted-soft"
           >
             Section
           </label>
@@ -215,7 +215,7 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
             {...form.register("sectionId")}
             disabled={!selectedProject}
             className={cn(
-              "mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900",
+              "mt-1 w-full rounded-lg border border-stroke px-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-stroke dark:bg-surface",
               !selectedProject && "opacity-50",
             )}
           >
@@ -233,14 +233,14 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          className="rounded-md px-3 py-1.5 text-sm font-medium text-muted hover:bg-surface-subtle dark:text-muted-soft dark:hover:bg-surface-subtle"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={updateTask.isPending}
-          className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200"
+          className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
         >
           Save
         </button>

@@ -11,7 +11,7 @@ export default function FiltersPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center">
-          <p className="text-zinc-500 dark:text-zinc-400">Loading filters…</p>
+          <p className="text-muted dark:text-muted-soft">Loading filters…</p>
         </div>
       }
     >
@@ -52,7 +52,7 @@ function FiltersContent() {
       title="Filters"
       filter={filter}
       header={
-        <div className="mb-6 space-y-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="mb-6 space-y-3 rounded-lg border border-stroke bg-surface-subtle p-3 dark:border-stroke dark:bg-surface">
           <div className="flex flex-wrap gap-3">
             <select
               value={status ?? ""}
@@ -63,7 +63,7 @@ function FiltersContent() {
                 )
               }
               aria-label="Status"
-              className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+              className="rounded-lg border border-stroke bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-stroke dark:bg-surface"
             >
               <option value="">All active</option>
               <option value="open">Open</option>
@@ -78,7 +78,7 @@ function FiltersContent() {
                 )
               }
               aria-label="Project"
-              className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+              className="rounded-lg border border-stroke bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-stroke dark:bg-surface"
             >
               <option value="">All projects</option>
               {projects?.map((project) => (
@@ -100,7 +100,7 @@ function FiltersContent() {
                 updateParam("q", e.target.value.trim() || undefined)
               }
               placeholder="Search tasks…"
-              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+              className="w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-stroke dark:bg-surface"
             />
           </form>
         </div>

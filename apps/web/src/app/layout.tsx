@@ -29,7 +29,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <ThemeScript />
       </head>
-      <body className="min-h-full flex flex-col bg-white text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
+      <body className="min-h-full bg-canvas text-ink">
         <Providers>{children}</Providers>
       </body>
     </html>

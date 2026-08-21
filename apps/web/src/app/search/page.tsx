@@ -18,7 +18,7 @@ export default function SearchPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search tasks…"
-            className="w-full rounded-lg border border-zinc-300 px-4 py-3 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-lg border border-stroke px-4 py-3 text-sm focus:border-primary focus:outline-none dark:border-stroke dark:bg-surface"
           />
         </div>
       }

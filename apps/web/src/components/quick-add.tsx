@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ArrowUp, CalendarDays, Hash, Tag, AtSign } from "lucide-react";
 import { useCreateTask } from "@/hooks/use-tasks";
 import { useProjects, useSections } from "@/hooks/use-projects";
 import { useTags } from "@/hooks/use-tags";
@@ -35,29 +36,35 @@ export function QuickAdd({ projectId }: QuickAddProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="relative" data-testid="quick-add-form">
-      <label htmlFor="quick-add" className="sr-only">
-        Quick add task
-      </label>
-      <input
-        id="quick-add"
-        type="text"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="Buy milk #Personal @Errands +Home !2 tomorrow at 14:00"
-        disabled={createTask.isPending}
-        className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-3 pr-20 text-sm shadow-sm placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
-      />
-      <button
-        type="submit"
-        disabled={createTask.isPending || !value.trim()}
-        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-950"
-      >
-        {createTask.isPending ? "Adding…" : "Add"}
-      </button>
-      <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-        #project · @section · +label · !1–!4 priority · today/tomorrow/next monday · at HH:MM
-      </p>
+    <form onSubmit={handleSubmit} className="rounded-xl border border-stroke bg-surface p-2 shadow-card transition focus-within:border-primary/40 focus-within:shadow-md" data-testid="quick-add-form">
+      <div className="flex items-center gap-2">
+        <label htmlFor="quick-add" className="sr-only">Quick add task</label>
+        <input
+          id="quick-add"
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="What needs to get done?  Try “Review report tomorrow #Work”"
+          disabled={createTask.isPending}
+          className="h-11 min-w-0 flex-1 bg-transparent px-3 text-[15px] font-medium text-ink outline-none placeholder:font-normal placeholder:text-muted-soft"
+        />
+        <button
+          type="submit"
+          disabled={createTask.isPending || !value.trim()}
+          aria-label="Add"
+          className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-35"
+        >
+          <ArrowUp className="size-[18px]" />
+          <span className="sr-only">{createTask.isPending ? "Adding…" : "Add"}</span>
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-stroke px-3 pb-1 pt-2 text-[11px] font-medium text-muted">
+        <span className="inline-flex items-center gap-1"><Hash className="size-3" /> project</span>
+        <span className="inline-flex items-center gap-1"><AtSign className="size-3" /> section</span>
+        <span className="inline-flex items-center gap-1"><Tag className="size-3" /> label</span>
+        <span className="inline-flex items-center gap-1"><CalendarDays className="size-3" /> natural dates</span>
+        <span className="ml-auto hidden sm:inline">Q to focus</span>
+      </div>
     </form>
   );
 }

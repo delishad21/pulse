@@ -1,5 +1,6 @@
 "use client";
 
+import { Command, Palette } from "lucide-react";
 import { Shell } from "@/components/shell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LabelManager } from "@/components/label-manager";
@@ -7,30 +8,35 @@ import { LabelManager } from "@/components/label-manager";
 export default function SettingsPage() {
   return (
     <Shell>
-      <div className="mx-auto max-w-3xl">
-        <h1 className="mb-6 text-2xl font-semibold tracking-tight">Settings</h1>
+      <div className="mx-auto w-full max-w-[880px] px-4 py-8 md:px-8 md:py-10">
+        <div className="mb-7">
+          <h1 className="text-[30px] font-bold leading-tight tracking-[-0.03em] text-ink">Settings</h1>
+          <p className="mt-1 text-sm font-medium text-muted">Tune Pulse to the way you work.</p>
+        </div>
 
-        <div className="space-y-4 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-medium">Theme</h2>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Choose light, dark, or your system appearance.
-              </p>
+        <div className="overflow-hidden rounded-xl border border-stroke bg-surface shadow-card">
+          <div className="flex flex-col gap-4 border-b border-stroke p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary"><Palette className="size-5" /></div>
+              <div>
+                <h2 className="font-semibold text-ink">Appearance</h2>
+                <p className="mt-0.5 text-sm text-muted">Choose light, dark, or follow your system.</p>
+              </div>
             </div>
             <ThemeToggle />
           </div>
 
-          <div className="flex items-center justify-between border-t border-zinc-200 pt-4 dark:border-zinc-800">
-            <div>
-              <h2 className="font-medium">Keyboard shortcuts</h2>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Cmd/Ctrl + K palette · Q quick add · / search · G then I/T/U navigate. Focus a task row and use C complete, E edit, D due, P priority, M move.
-              </p>
+          <div className="border-b border-stroke p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-surface-subtle text-muted"><Command className="size-5" /></div>
+              <div>
+                <h2 className="font-semibold text-ink">Keyboard shortcuts</h2>
+                <p className="mt-0.5 text-sm leading-6 text-muted">Cmd/Ctrl + K palette · Q quick add · / search · G then I/T/U navigate. Focus a task row and use C complete, E edit, D due, P priority, M move.</p>
+              </div>
             </div>
           </div>
 
-          <LabelManager />
+          <div className="p-5"><LabelManager /></div>
         </div>
       </div>
     </Shell>
