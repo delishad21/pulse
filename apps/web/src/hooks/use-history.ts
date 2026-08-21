@@ -19,3 +19,16 @@ export function useUndo() {
     },
   });
 }
+
+export function useRedo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiClient.redoLast(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [historyKey] });
+      void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      void queryClient.invalidateQueries({ queryKey: ["comments"] });
+    },
+  });
+}

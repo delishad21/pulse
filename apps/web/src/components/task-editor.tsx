@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useUpdateTask } from "@/hooks/use-tasks";
 import { useProjects, useSections } from "@/hooks/use-projects";
+import { useTags } from "@/hooks/use-tags";
 import { cn } from "@/lib/utils";
 import type { Task } from "@pulse/api-client";
 
@@ -19,6 +20,8 @@ const taskSchema = z.object({
   dueAt: z.string().nullable().optional(),
   projectId: z.string().nullable().optional(),
   sectionId: z.string().nullable().optional(),
+  priority: z.enum(["none", "low", "medium", "high", "urgent"]),
+  tagIds: z.array(z.string()),
 });
 
 type TaskFormValues = z.infer<typeof taskSchema>;
@@ -29,9 +32,17 @@ interface TaskEditorProps {
   onSaved: () => void;
 }
 
+function toLocalDateTime(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
 export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
   const updateTask = useUpdateTask();
   const { data: projects } = useProjects();
+  const { data: tags } = useTags();
 
   const resolver: Resolver<TaskFormValues> = zodResolver(taskSchema);
   const form = useForm<TaskFormValues>({
@@ -40,9 +51,11 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
       title: task.title,
       description: task.description,
       dueDate: task.due.date,
-      dueAt: task.due.at,
+      dueAt: toLocalDateTime(task.due.at),
       projectId: task.projectId ?? null,
       sectionId: task.sectionId ?? null,
+      priority: task.priority,
+      tagIds: task.tags.map((tag) => tag.id),
     },
   });
 
@@ -57,10 +70,12 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
         input: {
           title: values.title,
           description: values.description,
-          dueDate: values.dueDate ?? null,
-          dueAt: values.dueAt ?? null,
-          projectId: values.projectId ?? null,
-          sectionId: values.sectionId ?? null,
+          dueDate: values.dueAt ? null : (values.dueDate || null),
+          dueAt: values.dueAt ? new Date(values.dueAt).toISOString() : null,
+          projectId: values.projectId || null,
+          sectionId: values.projectId ? (values.sectionId || null) : null,
+          priority: values.priority,
+          tagIds: values.tagIds,
         },
       },
       { onSuccess: onSaved },
@@ -127,6 +142,25 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
             {...form.register("dueAt")}
             className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
           />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor={`priority-${task.id}`} className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Priority</label>
+          <select id={`priority-${task.id}`} {...form.register("priority")} className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900">
+            <option value="none">None</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor={`labels-${task.id}`} className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Labels</label>
+          <select id={`labels-${task.id}`} multiple {...form.register("tagIds")} className="mt-1 h-24 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900">
+            {tags?.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+          </select>
         </div>
       </div>
 

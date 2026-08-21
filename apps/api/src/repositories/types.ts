@@ -49,7 +49,7 @@ export interface EventRepository {
   list(userId: UserId, taskId?: string): Promise<TaskEvent[]>; record(userId: UserId, taskId: string, kind: string, payload?: unknown): Promise<TaskEvent>;
 }
 export interface OperationRepository {
-  record(userId: UserId, kind: string, payload: unknown, taskId?: string): Promise<Operation>; list(userId: UserId): Promise<Operation[]>; undoLast(userId: UserId): Promise<Operation>; undo(userId: UserId, id: string): Promise<Operation>;
+  record(userId: UserId, kind: string, payload: unknown, taskId?: string): Promise<Operation>; list(userId: UserId): Promise<Operation[]>; undoLast(userId: UserId): Promise<Operation>; undo(userId: UserId, id: string): Promise<Operation>; redoLast(userId: UserId): Promise<Operation>; redo(userId: UserId, id: string): Promise<Operation>;
 }
 export interface PulseRepository {
   tasks: TaskRepository; views: ViewRepository; projects: ProjectRepository; sections: SectionRepository; tags: TagRepository; comments: CommentRepository; reminders: ReminderRepository; events: EventRepository; operations: OperationRepository; healthCheck(): Promise<{ database: "connected" | "in-memory" | "disconnected" }>;

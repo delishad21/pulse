@@ -8,3 +8,6 @@ export const undoLast = (userId:UserId):Promise<Operation> => getRepository().op
 export const undoOperation = (userId:UserId,id:string):Promise<Operation> => getRepository().operations.undo(userId,id);
 export const captureSnapshot = (userId:UserId,taskId:string):Promise<TaskSnapshot> => getRepository().tasks.captureSnapshot(userId,taskId);
 export const captureSnapshots = (userId:UserId,ids:string[]):Promise<TaskSnapshot[]> => Promise.all(ids.map((id)=>getRepository().tasks.captureSnapshot(userId,id)));
+
+export const redoLast = (userId:UserId):Promise<Operation> => getRepository().operations.redoLast(userId);
+export const redoOperation = (userId:UserId,id:string):Promise<Operation> => getRepository().operations.redo(userId,id);

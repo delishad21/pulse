@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { ThemeToggle } from "./theme-toggle";
 import { CommandPalette } from "./command-palette";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,46 @@ const navItems = [
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const waitingForGo = useRef(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    let goTimer: ReturnType<typeof setTimeout> | undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      const typing = target instanceof Element && target.matches("input, textarea, select, [contenteditable='true']");
+      if (typing || event.metaKey || event.ctrlKey || event.altKey) return;
+      const key = event.key.toLowerCase();
+
+      if (waitingForGo.current) {
+        waitingForGo.current = false;
+        if (goTimer) clearTimeout(goTimer);
+        const routes: Record<string, string> = { i: "/inbox", t: "/today", u: "/upcoming" };
+        if (routes[key]) {
+          event.preventDefault();
+          router.push(routes[key]);
+          return;
+        }
+      }
+      if (key === "g") {
+        waitingForGo.current = true;
+        goTimer = setTimeout(() => { waitingForGo.current = false; }, 800);
+        return;
+      }
+      if (key === "q") {
+        event.preventDefault();
+        const quickAdd = document.getElementById("quick-add") as HTMLInputElement | null;
+        if (quickAdd) quickAdd.focus();
+        else router.push("/inbox");
+      } else if (key === "/") {
+        event.preventDefault();
+        router.push("/search");
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => { window.removeEventListener("keydown", onKeyDown); if (goTimer) clearTimeout(goTimer); };
+  }, [router]);
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">

@@ -2,6 +2,7 @@
 
 import { Shell } from "@/components/shell";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LabelManager } from "@/components/label-manager";
 
 export default function SettingsPage() {
   return (
@@ -24,10 +25,12 @@ export default function SettingsPage() {
             <div>
               <h2 className="font-medium">Keyboard shortcuts</h2>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Cmd/Ctrl + K opens the command palette.
+                Cmd/Ctrl + K palette · Q quick add · / search · G then I/T/U navigate. Focus a task row and use C complete, E edit, D due, P priority, M move.
               </p>
             </div>
           </div>
+
+          <LabelManager />
         </div>
       </div>
     </Shell>

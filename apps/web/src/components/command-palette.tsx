@@ -138,10 +138,7 @@ export function CommandPalette() {
                 <button
                   key={task.id}
                   type="button"
-                  onClick={() => {
-                    // TODO: open task detail when available
-                    closePalette();
-                  }}
+                  onClick={() => navigate(`/task/${task.id}`)}
                   className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
                 >
                   {task.title}

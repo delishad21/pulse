@@ -49,6 +49,33 @@ export function useBulkTasks() {
   });
 }
 
+export function useBulkMoveTasks() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids, projectId, sectionId }: { ids: string[]; projectId: string | null; sectionId?: string | null }) =>
+      apiClient.bulkMove({ ids, projectId, sectionId }),
+    onSuccess: () => invalidateTasks(queryClient),
+  });
+}
+
+export function useBulkRescheduleTasks() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids, dueDate }: { ids: string[]; dueDate: string | null }) =>
+      apiClient.bulkReschedule({ ids, dueDate, dueAt: null }),
+    onSuccess: () => invalidateTasks(queryClient),
+  });
+}
+
+export function useReorderTasks() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (updates: Array<{ id: string; sortOrder: number }>) =>
+      apiClient.bulkReorder({ updates }),
+    onSuccess: () => invalidateTasks(queryClient),
+  });
+}
+
 export function useTask(id: string) {
   return useQuery({ queryKey: [tasksKey, id], queryFn: () => apiClient.getTask(id), enabled: Boolean(id) });
 }

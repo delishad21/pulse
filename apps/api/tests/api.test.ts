@@ -179,6 +179,62 @@ test("title-only PATCH preserves schedule and undo restores original task", asyn
   }
 });
 
+test("task sortOrder can be created and patched for persistent web ordering", async () => {
+  const { client, cleanup } = await createTestClient();
+  try {
+    const task = await client.createTask({ title: "Ordered task", sortOrder: 1000 });
+    assert.equal(task.sortOrder, 1000);
+    const moved = await client.updateTask(task.id, { sortOrder: 2500 });
+    assert.equal(moved.sortOrder, 2500);
+    assert.equal((await client.getTask(task.id)).sortOrder, 2500);
+  } finally {
+    await cleanup();
+  }
+});
+
+test("bulk reorder persists order as one undoable operation", async () => {
+  const { client, cleanup } = await createTestClient();
+  try {
+    const first = await client.createTask({ title: "First", sortOrder: 1000 });
+    const second = await client.createTask({ title: "Second", sortOrder: 2000 });
+    const before = await client.listOperations();
+    const reordered = await client.bulkReorder({ updates: [
+      { id: first.id, sortOrder: 2000 },
+      { id: second.id, sortOrder: 1000 },
+    ] });
+    assert.equal(reordered.find((task) => task.id === first.id)?.sortOrder, 2000);
+    assert.equal(reordered.find((task) => task.id === second.id)?.sortOrder, 1000);
+    const after = await client.listOperations();
+    assert.equal(after[0]?.kind, "TASK_BULK_UPDATE");
+    assert.notEqual(after[0]?.id, before[0]?.id);
+    await client.undoLast();
+    assert.equal((await client.getTask(first.id)).sortOrder, 1000);
+    assert.equal((await client.getTask(second.id)).sortOrder, 2000);
+  } finally {
+    await cleanup();
+  }
+});
+
+test("undo and redo restore both update and create operations", async () => {
+  const { client, cleanup } = await createTestClient();
+  try {
+    const task = await client.createTask({ title: "Before redo" });
+    await client.updateTask(task.id, { title: "After redo" });
+    await client.undoLast();
+    assert.equal((await client.getTask(task.id)).title, "Before redo");
+    await client.redoLast();
+    assert.equal((await client.getTask(task.id)).title, "After redo");
+
+    const created = await client.createTask({ title: "Redo create" });
+    await client.undoLast();
+    await assert.rejects(() => client.getTask(created.id), /Task not found/);
+    await client.redoLast();
+    assert.equal((await client.getTask(created.id)).title, "Redo create");
+  } finally {
+    await cleanup();
+  }
+});
+
 test("foreign project, section, parent and tag relations are rejected", async () => {
   const foreignUser = "foreign_user";
   const repository = createMemoryRepository(TEST_USER.id, [foreignUser]);

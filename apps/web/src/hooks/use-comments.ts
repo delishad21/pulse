@@ -28,3 +28,19 @@ export function useCreateComment() {
     },
   });
 }
+
+export function useUpdateComment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, id, body }: { taskId: string; id: string; body: string }) => apiClient.updateComment(taskId, id, { body }),
+    onSuccess: (_data, variables) => void queryClient.invalidateQueries({ queryKey: [commentsKey, variables.taskId] }),
+  });
+}
+
+export function useDeleteComment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, id }: { taskId: string; id: string }) => apiClient.deleteComment(taskId, id),
+    onSuccess: (_data, variables) => void queryClient.invalidateQueries({ queryKey: [commentsKey, variables.taskId] }),
+  });
+}

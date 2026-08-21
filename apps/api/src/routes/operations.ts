@@ -17,9 +17,20 @@ export default async function operationRoutes(app: FastifyInstance): Promise<voi
     reply.send(await operationService.undoLast(user.id));
   });
 
+  app.post("/redo-last", async (request, reply) => {
+    const user = getUser(request);
+    reply.send(await operationService.redoLast(user.id));
+  });
+
   app.post("/:id/undo", async (request, reply) => {
     const user = getUser(request);
     const { id } = parseParams(IdParam, request.params);
     reply.send(await operationService.undoOperation(user.id, id));
+  });
+
+  app.post("/:id/redo", async (request, reply) => {
+    const user = getUser(request);
+    const { id } = parseParams(IdParam, request.params);
+    reply.send(await operationService.redoOperation(user.id, id));
   });
 }

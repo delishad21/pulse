@@ -27,6 +27,7 @@ export interface CreateTaskInput {
   projectId?: string | null;
   sectionId?: string | null;
   parentTaskId?: string | null;
+  sortOrder?: number;
   tagIds?: string[];
 }
 
@@ -41,6 +42,7 @@ export interface UpdateTaskInput {
   projectId?: string | null;
   sectionId?: string | null;
   parentTaskId?: string | null;
+  sortOrder?: number;
   tagIds?: string[];
 }
 
@@ -116,6 +118,7 @@ export class PulseApiClient {
   bulkUpdate(input: BulkUpdateInput): Promise<Task[]> { return this.request("POST", "/api/tasks/bulk/update", input); }
   bulkMove(input: { ids: string[]; projectId: string | null; sectionId?: string | null }): Promise<Task[]> { return this.request("POST", "/api/tasks/bulk/move", input); }
   bulkReschedule(input: { ids: string[]; dueDate?: string | null; dueAt?: string | null; reminderAt?: string | null }): Promise<Task[]> { return this.request("POST", "/api/tasks/bulk/reschedule", input); }
+  bulkReorder(input: { updates: Array<{ id: string; sortOrder: number }> }): Promise<Task[]> { return this.request("POST", "/api/tasks/bulk/reorder", input); }
 
   getInbox(): Promise<Task[]> { return this.request("GET", "/api/views/inbox"); }
   getToday(): Promise<Task[]> { return this.request("GET", "/api/views/today"); }
@@ -154,6 +157,8 @@ export class PulseApiClient {
   listOperations(): Promise<Operation[]> { return this.request("GET", "/api/operations"); }
   undoOperation(id: string): Promise<Operation> { return this.request("POST", `/api/operations/${id}/undo`); }
   undoLast(): Promise<Operation> { return this.request("POST", "/api/operations/undo-last"); }
+  redoOperation(id: string): Promise<Operation> { return this.request("POST", `/api/operations/${id}/redo`); }
+  redoLast(): Promise<Operation> { return this.request("POST", "/api/operations/redo-last"); }
   listActivity(): Promise<TaskEvent[]> { return this.request("GET", "/api/activity"); }
   getTaskHistory(taskId: string): Promise<TaskEvent[]> { return this.request("GET", `/api/tasks/${taskId}/history`); }
 }
