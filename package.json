@@ -13,6 +13,7 @@
     "dev:api": "npm run dev -w @pulse/api",
     "dev:web": "npm run dev -w @pulse/web",
     "dev:mobile": "npm run start -w @pulse/mobile",
+    "dev:mcp": "npm run dev -w @pulse/mcp",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
