@@ -30,7 +30,7 @@ CMD ["sh", "-c", "npm run db:deploy && exec npm run start -w @pulse/api"]
 
 FROM source AS mcp
 ENV NODE_ENV=production
-CMD ["npm", "run", "start", "-w", "@pulse/mcp"]
+CMD ["./node_modules/.bin/tsx", "apps/mcp/src/index.ts"]
 
 FROM source AS web
 ENV NODE_ENV=production
