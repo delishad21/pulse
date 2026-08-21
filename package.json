@@ -19,7 +19,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "db:generate": "npm run db:generate -w @pulse/db",
-    "db:migrate": "npm run db:migrate -w @pulse/db"
+    "db:migrate": "npm run db:migrate -w @pulse/db",
+    "db:deploy": "npm run db:deploy -w @pulse/db"
   },
   "dependencies": {
     "dotenv": "^16.6.1",

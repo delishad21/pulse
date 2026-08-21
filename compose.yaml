@@ -1,0 +1,86 @@
+name: pulse
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pulse
+      POSTGRES_USER: pulse
+      POSTGRES_PASSWORD: ${PULSE_DB_PASSWORD}
+    volumes:
+      - pulse_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulse -d pulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [internal]
+
+  api:
+    build:
+      context: .
+      target: api
+    image: pulse-api:local
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://pulse:${PULSE_DB_PASSWORD}@db:5432/pulse
+      PORT: 4000
+      PULSE_WEB_TOKEN: ${PULSE_WEB_TOKEN}
+      PULSE_SERVICE_TOKEN: ${PULSE_SERVICE_TOKEN}
+      PULSE_DEFAULT_USER_EMAIL: ${PULSE_DEFAULT_USER_EMAIL:-pulse@local}
+      PULSE_DEFAULT_USER_NAME: ${PULSE_DEFAULT_USER_NAME:-Pulse User}
+      PULSE_DEFAULT_TIMEZONE: ${PULSE_DEFAULT_TIMEZONE:-Asia/Singapore}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:4000/api/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [internal]
+
+  web:
+    build:
+      context: .
+      target: web
+    image: pulse-web:local
+    restart: unless-stopped
+    environment:
+      PULSE_API_INTERNAL_URL: http://api:4000
+      PULSE_WEB_TOKEN: ${PULSE_WEB_TOKEN}
+      NEXT_TELEMETRY_DISABLED: 1
+    ports:
+      - "127.0.0.1:${PULSE_WEB_PORT:-3210}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [internal]
+
+  mcp:
+    build:
+      context: .
+      target: mcp
+    image: pulse-mcp:local
+    profiles: ["mcp"]
+    environment:
+      PULSE_API_BASE_URL: http://api:4000
+      PULSE_API_TOKEN: ${PULSE_SERVICE_TOKEN}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [internal]
+
+networks:
+  internal:
+    name: pulse_internal
+    internal: true
+
+volumes:
+  pulse_postgres:
+    name: pulse_postgres

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import Fastify from "fastify";
 import { setRepository } from "./repositories/registry.js";
-import { registerAuth } from "./lib/auth.js";
+import { registerAuth, type AuthOptions } from "./lib/auth.js";
 import { registerErrorHandler } from "./lib/errors.js";
 import { registerRoutes } from "./routes/index.js";
 import type { PulseRepository } from "./repositories/types.js";
@@ -10,16 +10,19 @@ export interface ServerOptions {
   repository?: PulseRepository;
   port?: number;
   defaultUser?: { id: string; email: string; name: string | null; timezone: string };
+  auth?: AuthOptions;
 }
 
 export async function ensureDefaultUser(): Promise<{ id: string; email: string; name: string | null; timezone: string }> {
   const { prisma } = await import("@pulse/db");
-  const email = "dev@pulse.local";
+  const email = process.env.PULSE_DEFAULT_USER_EMAIL ?? "dev@pulse.local";
+  const name = process.env.PULSE_DEFAULT_USER_NAME ?? "Local Dev";
+  const timezone = process.env.PULSE_DEFAULT_TIMEZONE ?? "UTC";
   let user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
-    user = await prisma.user.create({
-      data: { email, name: "Local Dev", timezone: "UTC" },
-    });
+    user = await prisma.user.create({ data: { email, name, timezone } });
+  } else if (user.name !== name || user.timezone !== timezone) {
+    user = await prisma.user.update({ where: { id: user.id }, data: { name, timezone } });
   }
   return { id: user.id, email: user.email, name: user.name, timezone: user.timezone };
 }
@@ -31,7 +34,10 @@ export async function buildApp(options: ServerOptions = {}) {
   const repository = options.repository ?? (await import("./repositories/prisma.js")).prismaRepository;
   setRepository(repository);
 
-  await registerAuth(app, defaultUser);
+  await registerAuth(app, defaultUser, options.auth ?? {
+    webToken: process.env.PULSE_WEB_TOKEN,
+    serviceToken: process.env.PULSE_SERVICE_TOKEN,
+  });
   await registerErrorHandler(app);
   await registerRoutes(app);
 

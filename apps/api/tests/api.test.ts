@@ -35,6 +35,36 @@ test("health endpoints are reachable", async () => {
   }
 });
 
+test("production auth accepts web/service tokens and rejects missing or invalid credentials", async () => {
+  const repository = createMemoryRepository(TEST_USER.id);
+  const app = await buildApp({
+    repository,
+    defaultUser: TEST_USER,
+    auth: { webToken: "web-secret", serviceToken: "service-secret" },
+  });
+  const baseUrl = await app.listen({ port: 0 });
+  try {
+    const health = await fetch(`${baseUrl}/api/health/live`);
+    assert.equal(health.status, 200);
+
+    const missing = await fetch(`${baseUrl}/api/tasks`);
+    assert.equal(missing.status, 401);
+    const invalid = await fetch(`${baseUrl}/api/tasks`, {
+      headers: { Authorization: "Bearer wrong-secret" },
+    });
+    assert.equal(invalid.status, 401);
+
+    for (const token of ["web-secret", "service-secret"]) {
+      const client = new PulseApiClient({ baseUrl, getAccessToken: async () => token });
+      const tasks = await client.listTasks();
+      assert.deepEqual(tasks, []);
+    }
+  } finally {
+    await app.close();
+    clearRepository();
+  }
+});
+
 test("task CRUD with date-only due date", async () => {
   const { client, cleanup } = await createTestClient();
   try {

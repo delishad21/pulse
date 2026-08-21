@@ -17,6 +17,19 @@ export type PulseMcpApi = Pick<
   | "updateTask"
   | "completeTask"
   | "rescheduleTask"
+  | "getTask"
+  | "getUpcoming"
+  | "getOverdue"
+  | "reopenTask"
+  | "cancelTask"
+  | "moveTask"
+  | "bulkComplete"
+  | "bulkReschedule"
+  | "bulkMove"
+  | "listProjects"
+  | "listTags"
+  | "createComment"
+  | "getTaskHistory"
 >;
 
 const prioritySchema = z.enum(["none", "low", "medium", "high", "urgent"]);
@@ -39,6 +52,23 @@ const createTaskSchema = z.object({
 const updateTaskSchema = createTaskSchema.partial().extend({
   id: z.string().min(1),
 });
+
+const taskIdSchema = z.object({ id: z.string().min(1) });
+const moveTaskSchema = taskIdSchema.extend({
+  projectId: z.string().nullable(),
+  sectionId: z.string().nullable().optional(),
+});
+const bulkIdsSchema = z.object({ ids: z.array(z.string().min(1)).min(1).max(1000) });
+const bulkMoveSchema = bulkIdsSchema.extend({
+  projectId: z.string().nullable(),
+  sectionId: z.string().nullable().optional(),
+});
+const bulkRescheduleSchema = bulkIdsSchema.extend({
+  dueDate: dateOnlySchema.nullable().optional(),
+  dueAt: z.string().nullable().optional(),
+  reminderAt: z.string().nullable().optional(),
+});
+const commentSchema = taskIdSchema.extend({ body: z.string().trim().min(1).max(10000) });
 
 const rescheduleTaskSchema = z.object({
   id: z.string().min(1),
@@ -145,6 +175,20 @@ export function createPulseMcpServer(api: PulseMcpApi): McpServer {
     async ({ id, ...input }) =>
       run(async () => ({ task: await api.rescheduleTask(id, input) })),
   );
+
+  server.registerTool("get_task", { description: "Get one Pulse task by id.", inputSchema: taskIdSchema, annotations: { readOnlyHint: true } }, async ({ id }) => run(async () => ({ task: await api.getTask(id) })));
+  server.registerTool("get_upcoming", { description: "Get upcoming open Pulse tasks.", inputSchema: z.object({}), annotations: { readOnlyHint: true } }, async () => run(async () => tasksResult(await api.getUpcoming())));
+  server.registerTool("get_overdue", { description: "Get overdue open Pulse tasks.", inputSchema: z.object({}), annotations: { readOnlyHint: true } }, async () => run(async () => tasksResult(await api.getOverdue())));
+  server.registerTool("reopen_task", { description: "Reopen a completed Pulse task.", inputSchema: taskIdSchema }, async ({ id }) => run(async () => ({ task: await api.reopenTask(id) })));
+  server.registerTool("cancel_task", { description: "Cancel a Pulse task without hard deleting it.", inputSchema: taskIdSchema }, async ({ id }) => run(async () => ({ task: await api.cancelTask(id) })));
+  server.registerTool("move_task", { description: "Move a Pulse task to a project and optional section.", inputSchema: moveTaskSchema }, async ({ id, projectId, sectionId }) => run(async () => ({ task: await api.moveTask(id, { projectId, sectionId }) })));
+  server.registerTool("bulk_complete_tasks", { description: "Complete multiple Pulse tasks as one bulk operation.", inputSchema: bulkIdsSchema }, async ({ ids }) => run(async () => tasksResult(await api.bulkComplete({ ids }))));
+  server.registerTool("bulk_reschedule_tasks", { description: "Reschedule multiple Pulse tasks.", inputSchema: bulkRescheduleSchema }, async ({ ids, ...schedule }) => run(async () => tasksResult(await api.bulkReschedule({ ids, ...schedule }))));
+  server.registerTool("bulk_move_tasks", { description: "Move multiple Pulse tasks to a project and optional section.", inputSchema: bulkMoveSchema }, async ({ ids, projectId, sectionId }) => run(async () => tasksResult(await api.bulkMove({ ids, projectId, sectionId }))));
+  server.registerTool("get_projects", { description: "List Pulse projects.", inputSchema: z.object({}), annotations: { readOnlyHint: true } }, async () => run(async () => ({ projects: await api.listProjects() })));
+  server.registerTool("get_labels", { description: "List Pulse labels.", inputSchema: z.object({}), annotations: { readOnlyHint: true } }, async () => run(async () => ({ labels: await api.listTags() })));
+  server.registerTool("add_comment", { description: "Add a comment to a Pulse task.", inputSchema: commentSchema }, async ({ id, body }) => run(async () => ({ comment: await api.createComment(id, { body }) })));
+  server.registerTool("get_task_activity", { description: "Get the activity history for a Pulse task.", inputSchema: taskIdSchema, annotations: { readOnlyHint: true } }, async ({ id }) => run(async () => ({ events: await api.getTaskHistory(id) })));
 
   return server;
 }
