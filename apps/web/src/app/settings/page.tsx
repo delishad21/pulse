@@ -15,7 +15,7 @@ export default function SettingsPage() {
             <div>
               <h2 className="font-medium">Theme</h2>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Toggle between light and dark mode.
+                Choose light, dark, or your system appearance.
               </p>
             </div>
             <ThemeToggle />

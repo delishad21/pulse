@@ -8,6 +8,7 @@ import { useProjects, useSections } from "@/hooks/use-projects";
 import { useTags } from "@/hooks/use-tags";
 import { cn } from "@/lib/utils";
 import type { Task } from "@pulse/api-client";
+import { parseRecurrenceRule } from "@pulse/domain";
 
 const taskSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -21,6 +22,10 @@ const taskSchema = z.object({
   projectId: z.string().nullable().optional(),
   sectionId: z.string().nullable().optional(),
   priority: z.enum(["none", "low", "medium", "high", "urgent"]),
+  recurrenceRule: z.string().nullable().optional().refine((value) => {
+    if (!value?.trim()) return true;
+    try { parseRecurrenceRule(value.trim()); return true; } catch { return false; }
+  }, "Use a valid RRULE, for example FREQ=WEEKLY;INTERVAL=1"),
   tagIds: z.array(z.string()),
 });
 
@@ -55,6 +60,7 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
       projectId: task.projectId ?? null,
       sectionId: task.sectionId ?? null,
       priority: task.priority,
+      recurrenceRule: task.recurrenceRule,
       tagIds: task.tags.map((tag) => tag.id),
     },
   });
@@ -75,6 +81,7 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
           projectId: values.projectId || null,
           sectionId: values.projectId ? (values.sectionId || null) : null,
           priority: values.priority,
+          recurrenceRule: values.recurrenceRule?.trim() || null,
           tagIds: values.tagIds,
         },
       },
@@ -143,6 +150,17 @@ export function TaskEditor({ task, onCancel, onSaved }: TaskEditorProps) {
             className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
           />
         </div>
+      </div>
+
+      <div>
+        <label htmlFor={`recurrence-${task.id}`} className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">Recurrence rule</label>
+        <input
+          id={`recurrence-${task.id}`}
+          {...form.register("recurrenceRule")}
+          placeholder="FREQ=WEEKLY;INTERVAL=1"
+          className="mt-1 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
+        />
+        <p className="mt-1 text-xs text-zinc-400">RRULE format; leave blank for a non-recurring task.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

@@ -3,8 +3,32 @@ import { apiClient } from "@/lib/api-client";
 
 const tasksKey = "tasks";
 
-export function useTasks(query?: { projectId?: string; sectionId?: string; status?: "open" | "completed" | "cancelled" }) {
-  return useQuery({ queryKey: [tasksKey, query], queryFn: () => apiClient.listTasks(query) });
+export function useTasks(query?: { projectId?: string; sectionId?: string; status?: "open" | "completed" | "cancelled" }, enabled = true) {
+  return useQuery({ queryKey: [tasksKey, query], queryFn: () => apiClient.listTasks(query), enabled });
+}
+
+export type CanonicalTaskView = "inbox" | "today" | "upcoming" | "completed";
+
+export function useTaskView(view: CanonicalTaskView, enabled = true) {
+  return useQuery({
+    queryKey: [tasksKey, "view", view],
+    enabled,
+    queryFn: () => {
+      if (view === "inbox") return apiClient.getInbox();
+      if (view === "today") return apiClient.getToday();
+      if (view === "upcoming") return apiClient.getUpcoming();
+      return apiClient.getCompleted();
+    },
+  });
+}
+
+export function useTaskSearch(query: string) {
+  const trimmed = query.trim();
+  return useQuery({
+    queryKey: [tasksKey, "search", trimmed],
+    queryFn: () => apiClient.searchTasks(trimmed),
+    enabled: trimmed.length > 0,
+  });
 }
 
 function invalidateTasks(queryClient: ReturnType<typeof useQueryClient>) {

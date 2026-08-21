@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useTasks, useBulkTasks, useBulkMoveTasks, useBulkRescheduleTasks } from "@/hooks/use-tasks";
+import { useTasks, useTaskView, useTaskSearch, useBulkTasks, useBulkMoveTasks, useBulkRescheduleTasks } from "@/hooks/use-tasks";
 import { useProjects, useSections } from "@/hooks/use-projects";
 import { useUndo, useRedo, useHistory } from "@/hooks/use-history";
 import { QuickAdd } from "./quick-add";
@@ -34,7 +34,15 @@ function getTasksQuery(filter: DashboardFilter) {
 }
 
 export function Dashboard({ title, filter, header }: DashboardProps) {
-  const { data: tasks, isLoading } = useTasks(getTasksQuery(filter));
+  const canonicalView = filter.type === "inbox" || filter.type === "today" || filter.type === "upcoming" || filter.type === "completed"
+    ? filter.type
+    : null;
+  const listQuery = useTasks(getTasksQuery(filter), canonicalView === null && filter.type !== "search");
+  const viewQuery = useTaskView(canonicalView ?? "inbox", canonicalView !== null);
+  const searchQuery = useTaskSearch(filter.type === "search" ? filter.q : "");
+  const tasksQuery = filter.type === "search" ? searchQuery : canonicalView ? viewQuery : listQuery;
+  const tasks = tasksQuery.data;
+  const isLoading = tasksQuery.isLoading;
   const { data: projects } = useProjects();
   const bulk = useBulkTasks();
   const bulkMove = useBulkMoveTasks();
@@ -48,7 +56,11 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
   const [bulkDueDate, setBulkDueDate] = useState("");
   const { data: moveSections } = useSections(moveProjectId || null);
 
-  const filtered = tasks ? filterTasks(tasks, filter) : [];
+  const filtered = tasks
+    ? (filter.type === "inbox" || filter.type === "today" || filter.type === "upcoming" || filter.type === "completed" || filter.type === "search")
+      ? tasks
+      : filterTasks(tasks, filter)
+    : [];
   const project =
     filter.type === "project"
       ? projects?.find((p) => p.id === filter.projectId)
