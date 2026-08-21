@@ -5,7 +5,7 @@ import { Errors } from "./errors.js";
 
 export interface RequestUser {
   id: UserId;
-  email: string;
+  username: string;
   name: string | null;
   timezone: string;
 }

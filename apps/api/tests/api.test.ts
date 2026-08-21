@@ -5,7 +5,7 @@ import { buildApp } from "../src/server.js";
 import { createMemoryRepository } from "../src/repositories/memory.js";
 import { clearRepository } from "../src/repositories/registry.js";
 
-const TEST_USER = { id: "test_user_1", email: "test@pulse.local", name: "Test User", timezone: "UTC" };
+const TEST_USER = { id: "test_user_1", username: "test-user", name: "Test User", timezone: "UTC" };
 
 async function createTestClient(repository = createMemoryRepository(TEST_USER.id)) {
   const app = await buildApp({ repository, defaultUser: TEST_USER });

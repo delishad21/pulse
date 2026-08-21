@@ -4,11 +4,11 @@ import { clearRepository } from "../src/repositories/registry.js";
 import { prisma } from "@pulse/db";
 
 const port = Number(process.env.PORT ?? 4010);
-const user = { id: "e2e_user", email: "e2e-auth@pulse.local", name: "E2E User", timezone: "Asia/Singapore" };
+const user = { id: "e2e_user", username: "e2e-user", name: "E2E User", timezone: "Asia/Singapore" };
 const passwordHash = "$2b$04$1UFlwqM7IOshjcy2RdixReTz4QzsU1li9R3dPvTEJP8bUXNEErTD2";
 await prisma.user.upsert({
   where: { id: user.id },
-  update: { email: user.email, name: user.name, timezone: user.timezone, passwordHash },
+  update: { username: user.username, name: user.name, timezone: user.timezone, passwordHash },
   create: { ...user, passwordHash },
 });
 const app = await buildApp({ repository: createMemoryRepository(user.id), defaultUser: user });

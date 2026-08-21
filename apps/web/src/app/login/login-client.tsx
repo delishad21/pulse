@@ -9,15 +9,15 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 export function LoginClient({ registrationEnabled }: { registrationEnabled: boolean }) {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setError(""); setLoading(true);
-    const result = await signIn("credentials", { email, password, redirect: false });
-    if (result?.error) { setError("Invalid email or password."); setLoading(false); return; }
+    const result = await signIn("credentials", { username, password, redirect: false });
+    if (result?.error) { setError("Invalid username or password."); setLoading(false); return; }
     const callbackUrl = new URLSearchParams(window.location.search).get("callbackUrl") || "/inbox";
     router.push(callbackUrl); router.refresh();
   }
@@ -30,7 +30,7 @@ export function LoginClient({ registrationEnabled }: { registrationEnabled: bool
         <h1 className="text-2xl font-bold tracking-tight text-ink">Welcome back</h1><p className="mt-1 text-sm text-muted">Sign in to your task workspace.</p>
         {error ? <div className="mt-5 rounded-lg border border-danger/25 bg-danger/10 px-3 py-2.5 text-sm font-medium text-danger">{error}</div> : null}
         <form onSubmit={submit} className="mt-6 space-y-4">
-          <label className="block"><span className="mb-1.5 block text-sm font-semibold text-ink">Email</span><input type="email" autoComplete="email" required value={email} onChange={(e)=>setEmail(e.target.value)} className="h-11 w-full rounded-lg border border-stroke bg-surface-subtle px-3 text-sm text-ink outline-none transition focus:border-primary" placeholder="you@example.com" /></label>
+          <label className="block"><span className="mb-1.5 block text-sm font-semibold text-ink">Username</span><input type="text" autoComplete="username" required value={username} onChange={(e)=>setUsername(e.target.value)} className="h-11 w-full rounded-lg border border-stroke bg-surface-subtle px-3 text-sm text-ink outline-none transition focus:border-primary" placeholder="delishad21" /></label>
           <label className="block"><span className="mb-1.5 block text-sm font-semibold text-ink">Password</span><input type="password" autoComplete="current-password" required minLength={8} value={password} onChange={(e)=>setPassword(e.target.value)} className="h-11 w-full rounded-lg border border-stroke bg-surface-subtle px-3 text-sm text-ink outline-none transition focus:border-primary" placeholder="Your password" /></label>
           <button type="submit" disabled={loading} className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-white transition hover:bg-primary/90 disabled:opacity-50"><LogIn className="size-4" />{loading ? "Signing in…" : "Sign in"}</button>
         </form>

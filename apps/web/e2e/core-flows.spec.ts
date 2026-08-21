@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/login");
-  await page.getByLabel("Email").fill("e2e-auth@pulse.local");
+  await page.getByLabel("Username").fill("e2e-user");
   await page.getByLabel("Password").fill("pulse-e2e-password");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/inbox$/);

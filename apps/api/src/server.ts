@@ -9,22 +9,27 @@ import type { PulseRepository } from "./repositories/types.js";
 export interface ServerOptions {
   repository?: PulseRepository;
   port?: number;
-  defaultUser?: { id: string; email: string; name: string | null; timezone: string };
+  defaultUser?: { id: string; username: string; name: string | null; timezone: string };
   auth?: AuthOptions;
 }
 
-export async function ensureDefaultUser(): Promise<{ id: string; email: string; name: string | null; timezone: string }> {
+export async function ensureDefaultUser(): Promise<{ id: string; username: string; name: string | null; timezone: string }> {
   const { prisma } = await import("@pulse/db");
-  const email = process.env.PULSE_DEFAULT_USER_EMAIL ?? "dev@pulse.local";
-  const name = process.env.PULSE_DEFAULT_USER_NAME ?? "Local Dev";
+  const username = process.env.PULSE_DEFAULT_USERNAME ?? "pulse";
+  const name = process.env.PULSE_DEFAULT_USER_NAME ?? "Pulse User";
   const timezone = process.env.PULSE_DEFAULT_TIMEZONE ?? "UTC";
-  let user = await prisma.user.findUnique({ where: { email } });
+  let user = await prisma.user.findUnique({ where: { username } });
+
   if (!user) {
-    user = await prisma.user.create({ data: { email, name, timezone } });
+    const legacyEmail = process.env.PULSE_LEGACY_DEFAULT_USER_EMAIL;
+    const legacy = legacyEmail ? await prisma.user.findUnique({ where: { email: legacyEmail } }) : null;
+    user = legacy
+      ? await prisma.user.update({ where: { id: legacy.id }, data: { username, email: null, name, timezone } })
+      : await prisma.user.create({ data: { username, name, timezone } });
   } else if (user.name !== name || user.timezone !== timezone) {
     user = await prisma.user.update({ where: { id: user.id }, data: { name, timezone } });
   }
-  return { id: user.id, email: user.email, name: user.name, timezone: user.timezone };
+  return { id: user.id, username: user.username, name: user.name, timezone: user.timezone };
 }
 
 export async function buildApp(options: ServerOptions = {}) {
@@ -40,7 +45,7 @@ export async function buildApp(options: ServerOptions = {}) {
     resolveUser: async (id) => {
       const { prisma } = await import("@pulse/db");
       const user = await prisma.user.findUnique({ where: { id } });
-      return user ? { id: user.id, email: user.email, name: user.name, timezone: user.timezone } : null;
+      return user ? { id: user.id, username: user.username, name: user.name, timezone: user.timezone } : null;
     },
   });
   await registerErrorHandler(app);

@@ -196,8 +196,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
         {session?.user ? (
           <div className="flex items-center gap-2 rounded-lg bg-surface-subtle px-3 py-2">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-ink">{session.user.name || session.user.email}</p>
-              <p className="truncate text-[11px] text-muted">{session.user.email}</p>
+              <p className="truncate text-xs font-semibold text-ink">{session.user.name || "Pulse user"}</p>
+              <p className="truncate text-[11px] text-muted">Signed in</p>
             </div>
             <button type="button" onClick={() => signOut({ callbackUrl: "/login" })} aria-label="Sign out" className="flex size-8 items-center justify-center rounded-md text-muted hover:bg-surface hover:text-danger">
               <LogOut className="size-4" />

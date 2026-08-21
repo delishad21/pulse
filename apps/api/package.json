@@ -11,6 +11,7 @@
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint src tests scripts",
+    "auth:create-user": "tsx scripts/create-user.ts",
     "auth:set-password": "tsx scripts/set-password.ts"
   },
   "dependencies": {
