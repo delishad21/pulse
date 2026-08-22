@@ -27,7 +27,6 @@ function FiltersContent() {
 
   const status = searchParams.get("status") as "open" | "completed" | null;
   const projectId = searchParams.get("projectId") ?? undefined;
-  const q = searchParams.get("q") ?? "";
 
   const updateParam = (key: string, value: string | undefined) => {
     const params = new URLSearchParams(searchParams);
@@ -44,7 +43,6 @@ function FiltersContent() {
     type: "filters",
     ...(status ? { status } : {}),
     ...(projectId ? { projectId } : {}),
-    ...(q ? { q } : {}),
   };
 
   return (
@@ -88,21 +86,6 @@ function FiltersContent() {
               ))}
             </select>
           </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-            }}
-          >
-            <input
-              type="search"
-              value={q}
-              onChange={(e) =>
-                updateParam("q", e.target.value.trim() || undefined)
-              }
-              placeholder="Search tasks…"
-              className="w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-stroke dark:bg-surface"
-            />
-          </form>
         </div>
       }
     />

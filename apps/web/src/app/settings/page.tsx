@@ -31,7 +31,7 @@ export default function SettingsPage() {
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-surface-subtle text-muted"><Command className="size-5" /></div>
               <div>
                 <h2 className="font-semibold text-ink">Keyboard shortcuts</h2>
-                <p className="mt-0.5 text-sm leading-6 text-muted">Cmd/Ctrl + K palette · Q quick add · / search · G then I/T/U navigate. Focus a task row and use C complete, E edit, D due, P priority, M move.</p>
+                <p className="mt-0.5 text-sm leading-6 text-muted">Q add task · G then I/T/U navigate. Focus a task row and use C complete, E edit, D due, P priority, M move.</p>
               </div>
             </div>
           </div>

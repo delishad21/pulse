@@ -22,15 +22,6 @@ export function useTaskView(view: CanonicalTaskView, enabled = true) {
   });
 }
 
-export function useTaskSearch(query: string) {
-  const trimmed = query.trim();
-  return useQuery({
-    queryKey: [tasksKey, "search", trimmed],
-    queryFn: () => apiClient.searchTasks(trimmed),
-    enabled: trimmed.length > 0,
-  });
-}
-
 function invalidateTasks(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: [tasksKey] });
   void queryClient.invalidateQueries({ queryKey: ["history"] });

@@ -20,7 +20,7 @@ export function LabelManager() {
     <div className="border-t border-stroke pt-4 dark:border-stroke">
       <div className="mb-3">
         <h2 className="font-medium">Labels</h2>
-        <p className="text-sm text-muted dark:text-muted-soft">Create labels for quick add (+label), filtering, and task editing.</p>
+        <p className="text-sm text-muted dark:text-muted-soft">Create labels for smart task text (+label), filtering, and task editing.</p>
       </div>
       <form onSubmit={submit} className="mb-3 flex gap-2">
         <label htmlFor="new-label" className="sr-only">New label</label>

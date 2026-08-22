@@ -2,28 +2,25 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CalendarDays,
   CalendarRange,
-  CheckCircle2,
   CircleCheckBig,
-  Command,
   Inbox,
   LayoutDashboard,
   Menu,
   LogOut,
   Plus,
-  Search,
   Settings,
   SlidersHorizontal,
   X,
 } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
-import { CommandPalette } from "./command-palette";
 import { useProjects } from "@/hooks/use-projects";
 import { cn } from "@/lib/utils";
 import { signOut, useSession } from "next-auth/react";
+import { TaskCreateModal } from "./task-create-modal";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
 const taskNav: NavItem[] = [
@@ -31,12 +28,10 @@ const taskNav: NavItem[] = [
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/today", label: "Today", icon: CalendarDays },
   { href: "/upcoming", label: "Upcoming", icon: CalendarRange },
-  { href: "/completed", label: "Completed", icon: CheckCircle2 },
 ];
 
 const toolNav: NavItem[] = [
   { href: "/filters", label: "Filters", icon: SlidersHorizontal },
-  { href: "/search", label: "Search", icon: Search },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -66,27 +61,17 @@ function NavLink({ item, pathname, onNavigate }: { item: NavItem; pathname: stri
   );
 }
 
-export function Shell({ children }: { children: React.ReactNode }) {
+export function Shell({ children, defaultProjectId = null }: { children: React.ReactNode; defaultProjectId?: string | null }) {
   const pathname = usePathname();
   const router = useRouter();
   const waitingForGo = useRef(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
   const { data: projects } = useProjects();
   const { data: session } = useSession();
 
-  const focusQuickAdd = useCallback(() => {
-    const quickAdd = document.getElementById("quick-add") as HTMLInputElement | null;
-    if (quickAdd) {
-      quickAdd.focus();
-      return;
-    }
-    router.push("/inbox");
-    setTimeout(() => (document.getElementById("quick-add") as HTMLInputElement | null)?.focus(), 150);
-  }, [router]);
+  const openAddTask = () => { setAddTaskOpen(true); setMobileOpen(false); };
 
-  const openCommandPalette = () => {
-    window.dispatchEvent(new Event("pulse:command-palette"));
-  };
   useEffect(() => {
     let goTimer: ReturnType<typeof setTimeout> | undefined;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -110,15 +95,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
         goTimer = setTimeout(() => { waitingForGo.current = false; }, 800);
       } else if (key === "q") {
         event.preventDefault();
-        focusQuickAdd();
-      } else if (key === "/") {
-        event.preventDefault();
-        router.push("/search");
+        openAddTask();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => { window.removeEventListener("keydown", onKeyDown); if (goTimer) clearTimeout(goTimer); };
-  }, [router, focusQuickAdd]);
+  }, [router]);
   const sidebar = (
     <aside className="flex h-full w-[286px] flex-col border-r border-stroke bg-surface px-4 py-5 dark:border-stroke">
       <div className="flex items-center gap-3 px-2">
@@ -133,7 +115,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
       <button
         type="button"
-        onClick={focusQuickAdd}
+        onClick={openAddTask}
         className="mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
       >
         <Plus className="size-4" />
@@ -184,15 +166,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="mt-4 space-y-2 border-t border-stroke pt-4">
-        <button
-          type="button"
-          onClick={openCommandPalette}
-          className="flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted transition hover:bg-surface-subtle hover:text-ink"
-        >
-          <Command className="size-[18px]" />
-          <span>Command palette</span>
-          <span className="ml-auto rounded border border-stroke bg-surface-subtle px-1.5 py-0.5 text-[10px] font-semibold text-muted">⌘K</span>
-        </button>
+        <div className="flex items-center justify-between rounded-lg px-3 py-1.5">
+          <span className="text-xs font-semibold text-muted">Appearance</span>
+          <ThemeToggle compact />
+        </div>
         {session?.user ? (
           <div className="flex items-center gap-2 rounded-lg bg-surface-subtle px-3 py-2">
             <div className="min-w-0 flex-1">
@@ -224,7 +201,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-[72px] shrink-0 items-center justify-between border-b border-stroke bg-surface/95 px-4 backdrop-blur md:px-6 lg:px-8">
+        <header className="flex h-[72px] shrink-0 items-center justify-between border-b border-stroke bg-surface/95 px-4 backdrop-blur md:hidden">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -241,22 +218,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={openCommandPalette}
-              className="hidden h-10 items-center gap-2 rounded-lg border border-stroke bg-surface-subtle px-3 text-sm text-muted transition hover:border-primary/30 hover:text-ink sm:flex"
-            >
-              <Search className="size-4" />
-              <span className="hidden lg:inline">Search anything</span>
-              <span className="rounded border border-stroke bg-surface px-1.5 py-0.5 text-[10px] font-semibold">⌘K</span>
-            </button>
             <ThemeToggle compact />
           </div>
         </header>
 
         <main className="pulse-scrollbar min-h-0 flex-1 overflow-y-auto">{children}</main>
       </div>
-      <CommandPalette />
+      <TaskCreateModal open={addTaskOpen} onClose={() => setAddTaskOpen(false)} defaultProjectId={defaultProjectId} />
     </div>
   );
 }

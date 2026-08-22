@@ -1,5 +1,5 @@
-import { Dashboard } from "@/components/dashboard";
+import { UpcomingCalendar } from "@/components/upcoming-calendar";
 
 export default function UpcomingPage() {
-  return <Dashboard title="Upcoming" filter={{ type: "upcoming" }} />;
+  return <UpcomingCalendar />;
 }

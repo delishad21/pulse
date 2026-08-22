@@ -16,21 +16,18 @@ function task(overrides: Partial<Task> = {}): Task {
 }
 
 describe("filterTasks", () => {
-  it("returns completed tasks", () => {
+  it("keeps only open tasks in the dashboard", () => {
     const open = task({ title: "Open" });
     const completed = task({ title: "Done", status: "completed" });
-    assert.deepEqual(filterTasks([open, completed], { type: "completed" }).map((t) => t.id), [completed.id]);
+    const cancelled = task({ title: "Cancelled", status: "cancelled" });
+    assert.deepEqual(filterTasks([open, completed, cancelled], { type: "all" }).map((item) => item.id), [open.id]);
   });
-  it("filters by status, project and query", () => {
+
+  it("filters by status and project", () => {
     const matching = task({ title: "Client open task", projectId: "p1" });
     const wrongStatus = task({ title: "Client done", status: "completed", projectId: "p1" });
     const wrongProject = task({ title: "Client open other", projectId: "p2" });
-    const result = filterTasks([matching, wrongStatus, wrongProject], { type: "filters", status: "open", projectId: "p1", q: "client" });
-    assert.deepEqual(result.map((t) => t.id), [matching.id]);
-  });
-  it("matches query text in title or description", () => {
-    const a = task({ title: "Alpha task" });
-    const b = task({ title: "Beta", description: "contains alpha" });
-    assert.equal(filterTasks([a, b], { type: "filters", q: "alpha" }).length, 2);
+    const result = filterTasks([matching, wrongStatus, wrongProject], { type: "filters", status: "open", projectId: "p1" });
+    assert.deepEqual(result.map((item) => item.id), [matching.id]);
   });
 });

@@ -165,7 +165,7 @@ export function TaskList({ tasks, selectedIds, onSelect, reorderable = false }: 
       <div className="flex min-h-[260px] flex-col items-center justify-center px-6 py-12 text-center">
         <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-primary-soft text-primary"><CheckCircle2 className="size-6" /></div>
         <p className="text-sm font-semibold text-ink">You’re all clear</p>
-        <p className="mt-1 max-w-sm text-sm text-muted">Add a task above or enjoy the rare moment where everything is handled.</p>
+        <p className="mt-1 max-w-sm text-sm text-muted">Use Add task in the sidebar when something new comes up.</p>
       </div>
     );
   }

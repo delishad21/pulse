@@ -49,7 +49,7 @@ export function ProjectSections({ projectId }: { projectId: string }) {
           ))}
         </div>
       ) : (
-        <p className="text-xs text-muted">No sections yet. Add one, then use @section in quick add.</p>
+        <p className="text-xs text-muted">No sections yet. Add one, then use @section in your task text.</p>
       )}
     </div>
   );

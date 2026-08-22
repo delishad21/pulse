@@ -80,7 +80,7 @@ export default function ProjectsPage() {
           <div className="rounded-xl border border-dashed border-stroke bg-surface p-10 text-center">
             <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-xl bg-primary-soft text-primary"><FolderKanban className="size-6" /></div>
             <p className="font-semibold text-ink">No projects yet</p>
-            <p className="mt-1 text-sm text-muted">Create one above, then use #project in quick add.</p>
+            <p className="mt-1 text-sm text-muted">Create one above, then choose it in Add task or use #project in task text.</p>
           </div>
         )}
       </div>

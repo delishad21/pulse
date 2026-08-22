@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { CalendarClock, Check, FolderInput, RotateCcw, RotateCw, Trash2, X } from "lucide-react";
-import { useTasks, useTaskView, useTaskSearch, useBulkTasks, useBulkMoveTasks, useBulkRescheduleTasks } from "@/hooks/use-tasks";
+import { useTasks, useTaskView, useBulkTasks, useBulkMoveTasks, useBulkRescheduleTasks } from "@/hooks/use-tasks";
 import { useProjects, useSections } from "@/hooks/use-projects";
 import { useUndo, useRedo, useHistory } from "@/hooks/use-history";
-import { QuickAdd } from "./quick-add";
 import { TaskList } from "./task-list";
 import { Shell } from "./shell";
 import { filterTasks, type DashboardFilter } from "@/lib/dashboard-filters";
+import { groupTasksByDate } from "@/lib/task-dates";
 
 interface DashboardProps {
   title: string;
@@ -17,31 +17,27 @@ interface DashboardProps {
 }
 
 function getTasksQuery(filter: DashboardFilter) {
+  if (filter.type === "all") return { status: "open" as const };
   if (filter.type === "project") {
-    return { projectId: filter.projectId };
+    return { projectId: filter.projectId, status: "open" as const };
   }
   if (filter.type === "filters") {
     const query: {
       status?: "open" | "completed";
       projectId?: string;
-      q?: string;
     } = {};
     if (filter.status) query.status = filter.status;
     if (filter.projectId) query.projectId = filter.projectId;
-    if (filter.q) query.q = filter.q;
     return query;
   }
   return undefined;
 }
 
 export function Dashboard({ title, filter, header }: DashboardProps) {
-  const canonicalView = filter.type === "inbox" || filter.type === "today" || filter.type === "upcoming" || filter.type === "completed"
-    ? filter.type
-    : null;
-  const listQuery = useTasks(getTasksQuery(filter), canonicalView === null && filter.type !== "search");
+  const canonicalView = filter.type === "inbox" || filter.type === "today" ? filter.type : null;
+  const listQuery = useTasks(getTasksQuery(filter), canonicalView === null);
   const viewQuery = useTaskView(canonicalView ?? "inbox", canonicalView !== null);
-  const searchQuery = useTaskSearch(filter.type === "search" ? filter.q : "");
-  const tasksQuery = filter.type === "search" ? searchQuery : canonicalView ? viewQuery : listQuery;
+  const tasksQuery = canonicalView ? viewQuery : listQuery;
   const tasks = tasksQuery.data;
   const isLoading = tasksQuery.isLoading;
   const { data: projects } = useProjects();
@@ -58,7 +54,7 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
   const { data: moveSections } = useSections(moveProjectId || null);
 
   const filtered = tasks
-    ? (filter.type === "inbox" || filter.type === "today" || filter.type === "upcoming" || filter.type === "completed" || filter.type === "search")
+    ? (filter.type === "inbox" || filter.type === "today")
       ? tasks
       : filterTasks(tasks, filter)
     : [];
@@ -95,7 +91,7 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
   };
 
   return (
-    <Shell>
+    <Shell defaultProjectId={filter.type === "project" ? filter.projectId : null}>
       <div className="mx-auto w-full max-w-[980px] px-4 py-8 md:px-8 md:py-10">
         <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
@@ -137,18 +133,6 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
         </div>
 
         {header ? <div className="mb-5">{header}</div> : null}
-
-        <div className="mb-5">
-          <QuickAdd
-            projectId={
-              filter.type === "project"
-                ? filter.projectId
-                : filter.type === "filters"
-                  ? filter.projectId
-                  : undefined
-            }
-          />
-        </div>
 
         {selectedIds.length > 0 && (
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-primary-soft p-2.5 shadow-sm">
@@ -192,20 +176,37 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
           </div>
         )}
 
-        <section className="overflow-hidden rounded-xl border border-stroke bg-surface shadow-card">
-          {isLoading ? (
-            <div className="space-y-0 divide-y divide-stroke">
-              {[0, 1, 2, 3].map((item) => (
-                <div key={item} className="flex items-center gap-3 px-5 py-4">
-                  <div className="size-5 animate-pulse rounded-full bg-surface-subtle" />
-                  <div className="h-4 w-1/3 animate-pulse rounded bg-surface-subtle" />
+        {filter.type === "all" || filter.type === "inbox" ? (
+          isLoading ? (
+            <div className="space-y-6">{[0, 1].map((item) => <div key={item}><div className="mb-2 h-4 w-28 animate-pulse rounded bg-surface-subtle" /><div className="h-40 animate-pulse rounded-xl border border-stroke bg-surface" /></div>)}</div>
+          ) : filtered.length ? (
+            <div className="space-y-6">
+              {groupTasksByDate(filtered).map((group) => (
+                <div key={group.key ?? "no-date"} data-date-group={group.key ?? "no-date"}>
+                  <div className="mb-2 flex items-baseline gap-2 px-1">
+                    <h2 className="text-sm font-bold text-ink">{group.label}</h2>
+                    <span className="text-xs font-medium text-muted-soft">{group.tasks.length}</span>
+                  </div>
+                  <section className="overflow-hidden rounded-xl border border-stroke bg-surface shadow-card">
+                    <TaskList tasks={group.tasks} selectedIds={selectedIds} onSelect={toggleSelect} />
+                  </section>
                 </div>
               ))}
             </div>
           ) : (
-            <TaskList tasks={filtered} selectedIds={selectedIds} onSelect={toggleSelect} reorderable={filter.type === "project"} />
-          )}
-        </section>
+            <section className="rounded-xl border border-stroke bg-surface px-6 py-14 text-center shadow-card"><p className="text-sm font-semibold text-ink">You’re all clear</p><p className="mt-1 text-sm text-muted">Use Add task in the sidebar when something new comes up.</p></section>
+          )
+        ) : (
+          <section className="overflow-hidden rounded-xl border border-stroke bg-surface shadow-card">
+            {isLoading ? (
+              <div className="space-y-0 divide-y divide-stroke">
+                {[0, 1, 2, 3].map((item) => <div key={item} className="flex items-center gap-3 px-5 py-4"><div className="size-5 animate-pulse rounded-full bg-surface-subtle" /><div className="h-4 w-1/3 animate-pulse rounded bg-surface-subtle" /></div>)}
+              </div>
+            ) : (
+              <TaskList tasks={filtered} selectedIds={selectedIds} onSelect={toggleSelect} reorderable={filter.type === "project"} />
+            )}
+          </section>
+        )}
       </div>
     </Shell>
   );
