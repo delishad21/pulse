@@ -60,10 +60,12 @@ export function TaskModal({ task, onClose }: TaskModalProps) {
               <div className="mt-6 flex flex-wrap gap-2 text-xs font-semibold text-muted">
                 {project ? <span className="rounded-full bg-surface-subtle px-2.5 py-1.5">#{project.name}</span> : null}
                 {currentTask.priority !== "none" ? <span className="rounded-full bg-primary-soft px-2.5 py-1.5 capitalize text-primary">{currentTask.priority} priority</span> : null}
+                {currentTask.startAt ? <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-subtle px-2.5 py-1.5"><Clock3 className="size-3.5" />{new Date(currentTask.startAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}{currentTask.endAt ? `–${new Date(currentTask.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</span> : null}
                 {currentTask.due.date ? <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-subtle px-2.5 py-1.5"><CalendarDays className="size-3.5" />{currentTask.due.date}</span> : null}
                 {currentTask.due.at ? <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-subtle px-2.5 py-1.5"><Clock3 className="size-3.5" />{new Date(currentTask.due.at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span> : null}
+                {currentTask.reminders.length ? <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-subtle px-2.5 py-1.5">{currentTask.reminders.length} reminder{currentTask.reminders.length === 1 ? "" : "s"}</span> : null}
                 {currentTask.recurrenceRule ? <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-subtle px-2.5 py-1.5"><Repeat2 className="size-3.5" />Recurring</span> : null}
-                {currentTask.tags.map((tag) => <span key={tag.id} className="inline-flex items-center gap-1.5 rounded-full bg-surface-subtle px-2.5 py-1.5"><Tag className="size-3.5" />{tag.name}</span>)}
+                {currentTask.tags.map((tag) => <span key={tag.id} className="inline-flex items-center gap-1.5 rounded-full bg-surface-subtle px-2.5 py-1.5"><Tag className="size-3.5" />@{tag.name}</span>)}
               </div>
               <div className="mt-7 flex justify-end gap-2 border-t border-stroke pt-4">
                 <button type="button" onClick={close} className="h-9 rounded-lg px-3 text-sm font-semibold text-muted hover:bg-surface-subtle hover:text-ink">Close</button>

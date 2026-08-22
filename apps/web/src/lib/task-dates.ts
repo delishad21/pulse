@@ -5,8 +5,9 @@ export function localDateKey(date: Date): string {
 }
 
 export function taskDateKey(task: Task): string | null {
-  if (task.due.date) return task.due.date;
+  if (task.startAt) return localDateKey(new Date(task.startAt));
   if (task.due.at) return localDateKey(new Date(task.due.at));
+  if (task.due.date) return task.due.date;
   return null;
 }
 

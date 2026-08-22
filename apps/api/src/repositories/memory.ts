@@ -1,13 +1,11 @@
 import {
-  isTaskCompleted,
-  isTaskDueToday,
   isTaskFocus,
-  isTaskInInbox,
   isTaskOverdue,
-  isTaskUpcoming,
   normalizeTaskSchedule,
   parseRecurrenceRule,
   sortTasksForView,
+  taskViewDate,
+  type Task,
 } from "@pulse/domain";
 import { Errors } from "../lib/errors.js";
 import {
@@ -15,147 +13,143 @@ import {
   serializeOperation,
   serializeProject,
   serializeReminder,
-  serializeSection,
   serializeTag,
   serializeTask,
   serializeTaskEvent,
 } from "../services/task-serializer.js";
 import type { PulseRepository, TaskSnapshot } from "./types.js";
-import type { Task } from "@pulse/domain";
 
 const cuid = () => `cuid_${Math.random().toString(36).slice(2)}_${Date.now().toString(36)}`;
-
 type TaskStatusDb = "OPEN" | "COMPLETED" | "CANCELLED";
 type PriorityDb = "NONE" | "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 interface DbTask {
-  id: string; userId: string; projectId: string | null; sectionId: string | null; parentTaskId: string | null;
-  title: string; description: string | null; status: TaskStatusDb; priority: PriorityDb; dueDate: Date | null; dueAt: Date | null; reminderAt: Date | null; recurrenceRule: string | null; completedAt: Date | null; deletedAt: Date | null; sortOrder: number; revision: number; createdAt: Date; updatedAt: Date; tagIds: string[];
+  id:string; userId:string; projectId:string|null; parentTaskId:string|null;
+  title:string; description:string|null; status:TaskStatusDb; priority:PriorityDb;
+  startAt:Date|null; endAt:Date|null; dueDate:Date|null; dueAt:Date|null; recurrenceRule:string|null;
+  completedAt:Date|null; deletedAt:Date|null; sortOrder:number; revision:number; createdAt:Date; updatedAt:Date; tagIds:string[];
 }
-interface DbProject { id: string; userId: string; name: string; description: string | null; color: string | null; icon: string | null; status: "ACTIVE" | "ARCHIVED" | "COMPLETED"; sortOrder: number; createdAt: Date; updatedAt: Date; archivedAt: Date | null; deletedAt: Date | null; }
-interface DbSection { id: string; projectId: string; name: string; sortOrder: number; createdAt: Date; updatedAt: Date; deletedAt: Date | null; }
-interface DbTag { id: string; userId: string; name: string; color: string | null; createdAt: Date; updatedAt: Date; deletedAt: Date | null; }
-interface DbComment { id: string; taskId: string; userId: string; body: string; deletedAt: Date | null; createdAt: Date; updatedAt: Date; }
-interface DbReminder { id: string; taskId: string; userId: string; remindAt: Date; channel: string; status: string; createdAt: Date; updatedAt: Date; deletedAt: Date | null; }
-interface DbEvent { id: string; taskId: string; userId: string; kind: string; payload: unknown; createdAt: Date; }
-interface DbOperation { id: string; userId: string; taskId: string | null; kind: string; payload: unknown; undoneAt: Date | null; createdAt: Date; sequence: number; }
+interface DbProject { id:string; userId:string; name:string; description:string|null; color:string|null; icon:string|null; status:"ACTIVE"|"ARCHIVED"|"COMPLETED"; sortOrder:number; createdAt:Date; updatedAt:Date; archivedAt:Date|null; deletedAt:Date|null; }
+interface DbTag { id:string; userId:string; name:string; color:string|null; createdAt:Date; updatedAt:Date; deletedAt:Date|null; }
+interface DbComment { id:string; taskId:string; userId:string; body:string; deletedAt:Date|null; createdAt:Date; updatedAt:Date; }
+interface DbReminder { id:string; taskId:string; userId:string; remindAt:Date; channel:string; status:string; createdAt:Date; updatedAt:Date; deletedAt:Date|null; }
+interface DbEvent { id:string; taskId:string; userId:string; kind:string; payload:unknown; createdAt:Date; }
+interface DbOperation { id:string; userId:string; taskId:string|null; kind:string; payload:unknown; undoneAt:Date|null; createdAt:Date; sequence:number; }
 
-function parsePriority(priority: string): PriorityDb { return priority.toUpperCase() as PriorityDb; }
+function parsePriority(value:string):PriorityDb { return value.toUpperCase() as PriorityDb; }
+function validateRecurrence(value:string|null|undefined):void { if(value) parseRecurrenceRule(value); }
 
-export function createMemoryRepository(initialUserId?: string, additionalUserIds: string[] = []): PulseRepository {
-  const users = new Map<string, { id: string }>();
-  const tasks = new Map<string, DbTask>(); const projects = new Map<string, DbProject>(); const sections = new Map<string, DbSection>(); const tags = new Map<string, DbTag>();
-  const comments = new Map<string, DbComment>(); const reminders = new Map<string, DbReminder>(); const events = new Map<string, DbEvent>(); const operations = new Map<string, DbOperation>(); let operationSequence = 0;
-  if (initialUserId) users.set(initialUserId, { id: initialUserId });
-  for (const id of additionalUserIds) users.set(id, { id });
+export function createMemoryRepository(initialUserId?:string, additionalUserIds:string[]=[]):PulseRepository {
+  const users=new Map<string,{id:string}>();
+  const tasks=new Map<string,DbTask>(); const projects=new Map<string,DbProject>(); const tags=new Map<string,DbTag>();
+  const comments=new Map<string,DbComment>(); const reminders=new Map<string,DbReminder>(); const events=new Map<string,DbEvent>(); const operations=new Map<string,DbOperation>();
+  let operationSequence=0;
+  if(initialUserId) users.set(initialUserId,{id:initialUserId}); for(const id of additionalUserIds) users.set(id,{id});
 
-  function ensureUser(userId: string): void { if (!users.has(userId)) throw Errors.Unauthorized(); }
-  function getTask(userId: string, id: string, includeDeleted = false): DbTask { const task = tasks.get(id); if (!task || task.userId !== userId || (!includeDeleted && task.deletedAt)) throw Errors.NotFound("Task"); return task; }
-  function getProject(userId: string, id: string): DbProject { const project = projects.get(id); if (!project || project.userId !== userId || project.deletedAt) throw Errors.NotFound("Project"); return project; }
-  function getSection(userId: string, id: string): DbSection { const section = sections.get(id); if (!section || section.deletedAt) throw Errors.NotFound("Section"); getProject(userId, section.projectId); return section; }
-  function getTag(userId: string, id: string): DbTag { const tag = tags.get(id); if (!tag || tag.userId !== userId || tag.deletedAt) throw Errors.NotFound("Tag"); return tag; }
-  function getComment(userId: string, taskId: string, id: string): DbComment { getTask(userId, taskId); const comment = comments.get(id); if (!comment || comment.taskId !== taskId || comment.userId !== userId || comment.deletedAt) throw Errors.NotFound("Comment"); return comment; }
-  function getReminder(userId: string, id: string): DbReminder { const reminder = reminders.get(id); if (!reminder || reminder.userId !== userId || reminder.deletedAt) throw Errors.NotFound("Reminder"); getTask(userId, reminder.taskId); return reminder; }
+  const ensureUser=(userId:string)=>{if(!users.has(userId))throw Errors.Unauthorized();};
+  const getTask=(userId:string,id:string,includeDeleted=false)=>{const t=tasks.get(id);if(!t||t.userId!==userId||(!includeDeleted&&t.deletedAt))throw Errors.NotFound("Task");return t;};
+  const getProject=(userId:string,id:string)=>{const p=projects.get(id);if(!p||p.userId!==userId||p.deletedAt)throw Errors.NotFound("Project");return p;};
+  const getTag=(userId:string,id:string)=>{const t=tags.get(id);if(!t||t.userId!==userId||t.deletedAt)throw Errors.NotFound("Tag");return t;};
+  const getComment=(userId:string,taskId:string,id:string)=>{getTask(userId,taskId);const c=comments.get(id);if(!c||c.userId!==userId||c.taskId!==taskId||c.deletedAt)throw Errors.NotFound("Comment");return c;};
+  const getReminder=(userId:string,id:string)=>{const r=reminders.get(id);if(!r||r.userId!==userId||r.deletedAt)throw Errors.NotFound("Reminder");getTask(userId,r.taskId);return r;};
 
-  function toTaskRecord(task: DbTask): Task {
-    return serializeTask({ ...task, tags: task.tagIds.map((id) => tags.get(id)).filter((tag): tag is DbTag => Boolean(tag && !tag.deletedAt)).map((tag) => ({ tag })) } as never);
+  function taskReminders(taskId:string):DbReminder[]{return [...reminders.values()].filter((r)=>r.taskId===taskId&&!r.deletedAt).sort((a,b)=>a.remindAt.getTime()-b.remindAt.getTime());}
+  function toTaskRecord(task:DbTask):Task {
+    const tagRows=task.tagIds.map((id)=>tags.get(id)).filter((tag):tag is DbTag=>Boolean(tag&&!tag.deletedAt)).map((tag)=>({tag}));
+    return serializeTask({...task,tags:tagRows,reminders:taskReminders(task.id)} as never);
   }
-  function taskSnapshot(task: DbTask): TaskSnapshot {
-    return { taskId: task.id, before: { title: task.title, description: task.description, status: task.status, priority: task.priority, dueDate: task.dueDate?.toISOString() ?? null, dueAt: task.dueAt?.toISOString() ?? null, reminderAt: task.reminderAt?.toISOString() ?? null, recurrenceRule: task.recurrenceRule, projectId: task.projectId, sectionId: task.sectionId, parentTaskId: task.parentTaskId, tagIds: [...task.tagIds], completedAt: task.completedAt?.toISOString() ?? null, deletedAt: task.deletedAt?.toISOString() ?? null, sortOrder: task.sortOrder, revision: task.revision } };
+  function reminderSnapshot(taskId:string){return taskReminders(taskId).map((r)=>({remindAt:r.remindAt.toISOString(),channel:r.channel,status:r.status}));}
+  function taskSnapshot(task:DbTask):TaskSnapshot {return {taskId:task.id,before:{title:task.title,description:task.description,status:task.status,priority:task.priority,startAt:task.startAt?.toISOString()??null,endAt:task.endAt?.toISOString()??null,dueDate:task.dueDate?.toISOString()??null,dueAt:task.dueAt?.toISOString()??null,recurrenceRule:task.recurrenceRule,projectId:task.projectId,parentTaskId:task.parentTaskId,tagIds:[...task.tagIds],reminders:reminderSnapshot(task.id),completedAt:task.completedAt?.toISOString()??null,deletedAt:task.deletedAt?.toISOString()??null,sortOrder:task.sortOrder,revision:task.revision}};}
+  function replaceReminders(userId:string,taskId:string,values:Array<{remindAt:string;channel?:string;status?:string}>):void {
+    const now=new Date(); for(const r of reminders.values())if(r.taskId===taskId&&!r.deletedAt){r.deletedAt=now;r.updatedAt=now;}
+    for(const value of values){const r:DbReminder={id:cuid(),userId,taskId,remindAt:new Date(value.remindAt),channel:value.channel??"hermes_telegram",status:value.status??"pending",createdAt:new Date(),updatedAt:new Date(),deletedAt:null};reminders.set(r.id,r);}
   }
-  function restore(task: DbTask, snapshot: TaskSnapshot): void {
-    const b = snapshot.before;
-    task.title = b.title as string; task.description = (b.description as string | null) ?? null; task.status = b.status as TaskStatusDb; task.priority = b.priority as PriorityDb;
-    task.dueDate = b.dueDate ? new Date(b.dueDate as string) : null; task.dueAt = b.dueAt ? new Date(b.dueAt as string) : null; task.reminderAt = b.reminderAt ? new Date(b.reminderAt as string) : null;
-    task.recurrenceRule = (b.recurrenceRule as string | null) ?? null; task.projectId = (b.projectId as string | null) ?? null; task.sectionId = (b.sectionId as string | null) ?? null; task.parentTaskId = (b.parentTaskId as string | null) ?? null;
-    task.tagIds = [...((b.tagIds as string[]) ?? [])]; task.completedAt = b.completedAt ? new Date(b.completedAt as string) : null; task.deletedAt = b.deletedAt ? new Date(b.deletedAt as string) : null; task.sortOrder = Number(b.sortOrder ?? 0); task.revision = Number(b.revision ?? task.revision) + 1; task.updatedAt = new Date();
+  function restore(task:DbTask,snapshot:TaskSnapshot):void {
+    const b=snapshot.before; task.title=b.title as string; task.description=(b.description as string|null)??null; task.status=b.status as TaskStatusDb; task.priority=b.priority as PriorityDb;
+    task.startAt=b.startAt?new Date(b.startAt as string):null; task.endAt=b.endAt?new Date(b.endAt as string):null; task.dueDate=b.dueDate?new Date(b.dueDate as string):null; task.dueAt=b.dueAt?new Date(b.dueAt as string):null;
+    task.recurrenceRule=(b.recurrenceRule as string|null)??null; task.projectId=(b.projectId as string|null)??null; task.parentTaskId=(b.parentTaskId as string|null)??null; task.tagIds=[...((b.tagIds as string[])??[])];
+    task.completedAt=b.completedAt?new Date(b.completedAt as string):null; task.deletedAt=b.deletedAt?new Date(b.deletedAt as string):null; task.sortOrder=Number(b.sortOrder??0); task.revision=Number(b.revision??task.revision)+1; task.updatedAt=new Date();
+    replaceReminders(task.userId,task.id,(b.reminders as Array<{remindAt:string;channel?:string;status?:string}>)??[]);
   }
-  function validateRecurrence(value: string | null | undefined): void { if (value) parseRecurrenceRule(value); }
-  async function validateRelations(userId: string, input: { projectId?: string | null; sectionId?: string | null; parentTaskId?: string | null; tagIds?: string[]; addTagIds?: string[]; removeTagIds?: string[] }, current?: DbTask): Promise<{ projectId: string | null | undefined; sectionId: string | null | undefined }> {
-    let projectId = input.projectId; const sectionId = input.sectionId;
-    if (projectId) getProject(userId, projectId);
-    if (sectionId) {
-      const section = getSection(userId, sectionId);
-      const effectiveProject = projectId === undefined ? current?.projectId : projectId;
-      if (effectiveProject && effectiveProject !== section.projectId) throw Errors.Validation("Section does not belong to the selected project.");
-      if (!effectiveProject) projectId = section.projectId;
-    }
-    if (input.parentTaskId) getTask(userId, input.parentTaskId);
-    const tagIds = [...(input.tagIds ?? []), ...(input.addTagIds ?? []), ...(input.removeTagIds ?? [])];
-    for (const id of new Set(tagIds)) getTag(userId, id);
-    return { projectId, sectionId };
+  async function validateRelations(userId:string,input:{projectId?:string|null;parentTaskId?:string|null;tagIds?:string[];addTagIds?:string[];removeTagIds?:string[]}){
+    if(input.projectId)getProject(userId,input.projectId); if(input.parentTaskId)getTask(userId,input.parentTaskId);
+    for(const id of new Set([...(input.tagIds??[]),...(input.addTagIds??[]),...(input.removeTagIds??[])]))getTag(userId,id);
+  }
+  function statusAllowed(task:Task,includeCompleted:boolean){return task.status==="open"||(includeCompleted&&task.status==="completed");}
+  function mergedSchedule(task:DbTask,input:{startAt?:string|null;endAt?:string|null;dueDate?:string|null;dueAt?:string|null}) {
+    const startAt=input.startAt===undefined?(task.startAt?.toISOString()??null):input.startAt;
+    const endAt=input.endAt===undefined?(task.endAt?.toISOString()??null):input.endAt;
+    let dueDate=input.dueDate===undefined?(task.dueDate?.toISOString().slice(0,10)??null):input.dueDate;
+    let dueAt=input.dueAt===undefined?(task.dueAt?.toISOString()??null):input.dueAt;
+    if(input.dueDate!==undefined&&input.dueAt===undefined)dueAt=null;
+    if(input.dueAt!==undefined&&input.dueDate===undefined)dueDate=null;
+    return normalizeTaskSchedule({startAt,endAt,dueDate,dueAt});
   }
 
-  const repo: PulseRepository = {
-    healthCheck: async () => ({ database: "in-memory" }),
-    tasks: {
-      list: async (userId, filters = {}) => { ensureUser(userId); const out: Task[] = []; for (const task of tasks.values()) { if (task.userId !== userId || task.deletedAt) continue; if (filters.status && task.status !== filters.status.toUpperCase()) continue; if (filters.projectId !== undefined && task.projectId !== filters.projectId) continue; if (filters.sectionId !== undefined && task.sectionId !== filters.sectionId) continue; out.push(toTaskRecord(task)); } return out.sort((a,b) => a.sortOrder-b.sortOrder || a.createdAt.localeCompare(b.createdAt)); },
-      create: async (userId, input) => { ensureUser(userId); validateRecurrence(input.recurrenceRule); const rel = await validateRelations(userId, input); const schedule = normalizeTaskSchedule(input); const task: DbTask = { id:cuid(), userId, title:input.title, description:input.description??null, status:"OPEN", priority:parsePriority(input.priority??"none"), dueDate:schedule.due.date?new Date(`${schedule.due.date}T00:00:00Z`):null, dueAt:schedule.due.at?new Date(schedule.due.at):null, reminderAt:schedule.reminderAt?new Date(schedule.reminderAt):null, recurrenceRule:input.recurrenceRule??null, projectId:rel.projectId??null, sectionId:rel.sectionId??null, parentTaskId:input.parentTaskId??null, completedAt:null, deletedAt:null, sortOrder:input.sortOrder??0, revision:0, createdAt:new Date(), updatedAt:new Date(), tagIds:[...(input.tagIds??[])] }; tasks.set(task.id, task); return toTaskRecord(task); },
-      get: async (userId,id) => { ensureUser(userId); return toTaskRecord(getTask(userId,id)); },
-      update: async (userId,id,input) => { ensureUser(userId); const task=getTask(userId,id); validateRecurrence(input.recurrenceRule); const rel=await validateRelations(userId,input,task); const schedule=normalizeTaskSchedule(input); if(input.title!==undefined)task.title=input.title; if(input.description!==undefined)task.description=input.description; if(input.priority!==undefined)task.priority=parsePriority(input.priority); if(input.dueDate!==undefined)task.dueDate=schedule.due.date?new Date(`${schedule.due.date}T00:00:00Z`):null; if(input.dueAt!==undefined){task.dueAt=schedule.due.at?new Date(schedule.due.at):null;if(schedule.due.at)task.dueDate=null;} if(input.reminderAt!==undefined)task.reminderAt=schedule.reminderAt?new Date(schedule.reminderAt):null; if(input.recurrenceRule!==undefined)task.recurrenceRule=input.recurrenceRule; if(rel.projectId!==undefined)task.projectId=rel.projectId; if(rel.sectionId!==undefined)task.sectionId=rel.sectionId; if(input.parentTaskId!==undefined)task.parentTaskId=input.parentTaskId; if(input.sortOrder!==undefined)task.sortOrder=input.sortOrder; if(input.tagIds!==undefined)task.tagIds=[...input.tagIds]; task.revision+=1;task.updatedAt=new Date(); return toTaskRecord(task); },
-      delete: async(userId,id)=>{ensureUser(userId);const t=getTask(userId,id);t.deletedAt=new Date();t.revision+=1;t.updatedAt=new Date();},
-      complete: async(userId,id)=>{ensureUser(userId);const t=getTask(userId,id);t.status="COMPLETED";t.completedAt=new Date();t.revision+=1;t.updatedAt=new Date();return toTaskRecord(t);},
-      reopen: async(userId,id)=>{ensureUser(userId);const t=getTask(userId,id);t.status="OPEN";t.completedAt=null;t.revision+=1;t.updatedAt=new Date();return toTaskRecord(t);},
-      cancel: async(userId,id)=>{ensureUser(userId);const t=getTask(userId,id);t.status="CANCELLED";t.completedAt=null;t.revision+=1;t.updatedAt=new Date();return toTaskRecord(t);},
-      bulkComplete: async(userId,ids)=>{ensureUser(userId);const out:Task[]=[];for(const id of ids){const t=getTask(userId,id);t.status="COMPLETED";t.completedAt=new Date();t.revision+=1;t.updatedAt=new Date();out.push(toTaskRecord(t));}return out;},
-      bulkDelete: async(userId,ids)=>{ensureUser(userId);for(const id of ids){const t=getTask(userId,id);t.deletedAt=new Date();t.revision+=1;t.updatedAt=new Date();}},
-      bulkUpdate: async(userId,input)=>{ensureUser(userId);validateRecurrence(input.recurrenceRule);await validateRelations(userId,input);const schedule=normalizeTaskSchedule(input);const out:Task[]=[];for(const id of input.ids){const t=getTask(userId,id);const rel=await validateRelations(userId,input,t);if(input.title!==undefined)t.title=input.title;if(input.priority!==undefined)t.priority=parsePriority(input.priority);if(input.dueDate!==undefined)t.dueDate=schedule.due.date?new Date(`${schedule.due.date}T00:00:00Z`):null;if(input.dueAt!==undefined){t.dueAt=schedule.due.at?new Date(schedule.due.at):null;if(schedule.due.at)t.dueDate=null;}if(input.reminderAt!==undefined)t.reminderAt=schedule.reminderAt?new Date(schedule.reminderAt):null;if(input.recurrenceRule!==undefined)t.recurrenceRule=input.recurrenceRule;if(rel.projectId!==undefined)t.projectId=rel.projectId;if(rel.sectionId!==undefined)t.sectionId=rel.sectionId;if(input.addTagIds)for(const tagId of input.addTagIds)if(!t.tagIds.includes(tagId))t.tagIds.push(tagId);if(input.removeTagIds)t.tagIds=t.tagIds.filter((x)=>!input.removeTagIds!.includes(x));t.revision+=1;t.updatedAt=new Date();out.push(toTaskRecord(t));}return out;},
-      search: async(userId,query)=>{ensureUser(userId);const q=query.toLowerCase();const out:Task[]=[];for(const t of tasks.values()){if(t.userId!==userId||t.deletedAt)continue;const projectName=t.projectId?projects.get(t.projectId)?.name??"":"";const tagNames=t.tagIds.map((id)=>tags.get(id)?.name??"").join(" ");const bodies=[...comments.values()].filter((c)=>c.taskId===t.id&&!c.deletedAt).map((c)=>c.body).join(" ");if([t.title,t.description??"",projectName,tagNames,bodies].some((v)=>v.toLowerCase().includes(q)))out.push(toTaskRecord(t));}return out;},
-      captureSnapshot: async(userId,id)=>{ensureUser(userId);return taskSnapshot(getTask(userId,id,true));},
-      restoreSnapshot: async(userId,snapshot)=>{ensureUser(userId);const t=getTask(userId,snapshot.taskId,true);restore(t,snapshot);},
+  const repo:PulseRepository={
+    healthCheck:async()=>({database:"in-memory"}),
+    tasks:{
+      list:async(userId,filters={})=>{ensureUser(userId);return [...tasks.values()].filter((t)=>t.userId===userId&&!t.deletedAt&&(!filters.status||t.status===filters.status.toUpperCase())&&(filters.projectId===undefined||t.projectId===filters.projectId)).map(toTaskRecord).sort((a,b)=>a.sortOrder-b.sortOrder||a.createdAt.localeCompare(b.createdAt));},
+      create:async(userId,input)=>{ensureUser(userId);validateRecurrence(input.recurrenceRule);await validateRelations(userId,input);const s=normalizeTaskSchedule(input);const task:DbTask={id:cuid(),userId,title:input.title,description:input.description??null,status:"OPEN",priority:parsePriority(input.priority??"none"),startAt:s.startAt?new Date(s.startAt):null,endAt:s.endAt?new Date(s.endAt):null,dueDate:s.due.date?new Date(`${s.due.date}T00:00:00Z`):null,dueAt:s.due.at?new Date(s.due.at):null,recurrenceRule:input.recurrenceRule??null,projectId:input.projectId??null,parentTaskId:input.parentTaskId??null,completedAt:null,deletedAt:null,sortOrder:input.sortOrder??0,revision:0,createdAt:new Date(),updatedAt:new Date(),tagIds:[...(input.tagIds??[])]};tasks.set(task.id,task);if(input.reminders)replaceReminders(userId,task.id,input.reminders);return toTaskRecord(task);},
+      get:async(userId,id)=>{ensureUser(userId);return toTaskRecord(getTask(userId,id));},
+      update:async(userId,id,input)=>{ensureUser(userId);const t=getTask(userId,id);validateRecurrence(input.recurrenceRule);await validateRelations(userId,input);const s=mergedSchedule(t,input);if(input.title!==undefined)t.title=input.title;if(input.description!==undefined)t.description=input.description;if(input.priority!==undefined)t.priority=parsePriority(input.priority);if(input.startAt!==undefined)t.startAt=s.startAt?new Date(s.startAt):null;if(input.endAt!==undefined)t.endAt=s.endAt?new Date(s.endAt):null;if(input.dueDate!==undefined){t.dueDate=s.due.date?new Date(`${s.due.date}T00:00:00Z`):null;if(input.dueAt===undefined)t.dueAt=null;}if(input.dueAt!==undefined){t.dueAt=s.due.at?new Date(s.due.at):null;if(input.dueDate===undefined)t.dueDate=null;}if(input.recurrenceRule!==undefined)t.recurrenceRule=input.recurrenceRule;if(input.projectId!==undefined)t.projectId=input.projectId;if(input.parentTaskId!==undefined)t.parentTaskId=input.parentTaskId;if(input.sortOrder!==undefined)t.sortOrder=input.sortOrder;if(input.tagIds!==undefined)t.tagIds=[...input.tagIds];if(input.reminders!==undefined)replaceReminders(userId,id,input.reminders);t.revision+=1;t.updatedAt=new Date();return toTaskRecord(t);},
+      delete:async(userId,id)=>{ensureUser(userId);const t=getTask(userId,id);t.deletedAt=new Date();t.revision+=1;t.updatedAt=new Date();},
+      complete:async(userId,id,completedAt)=>{ensureUser(userId);const t=getTask(userId,id);t.status="COMPLETED";t.completedAt=completedAt;t.revision+=1;t.updatedAt=new Date();return toTaskRecord(t);},
+      reopen:async(userId,id)=>{ensureUser(userId);const t=getTask(userId,id);t.status="OPEN";t.completedAt=null;t.revision+=1;t.updatedAt=new Date();return toTaskRecord(t);},
+      cancel:async(userId,id)=>{ensureUser(userId);const t=getTask(userId,id);t.status="CANCELLED";t.completedAt=null;t.revision+=1;t.updatedAt=new Date();return toTaskRecord(t);},
+      bulkComplete:async(userId,ids,completedAt)=>{ensureUser(userId);return ids.map((id)=>{const t=getTask(userId,id);t.status="COMPLETED";t.completedAt=completedAt;t.revision+=1;t.updatedAt=new Date();return toTaskRecord(t);});},
+      bulkDelete:async(userId,ids)=>{ensureUser(userId);for(const id of ids){const t=getTask(userId,id);t.deletedAt=new Date();t.revision+=1;t.updatedAt=new Date();}},
+      bulkUpdate:async(userId,input)=>{ensureUser(userId);validateRecurrence(input.recurrenceRule);await validateRelations(userId,input);const out:Task[]=[];for(const id of input.ids){const t=getTask(userId,id);const s=mergedSchedule(t,input);if(input.title!==undefined)t.title=input.title;if(input.priority!==undefined)t.priority=parsePriority(input.priority);if(input.startAt!==undefined)t.startAt=s.startAt?new Date(s.startAt):null;if(input.endAt!==undefined)t.endAt=s.endAt?new Date(s.endAt):null;if(input.dueDate!==undefined){t.dueDate=s.due.date?new Date(`${s.due.date}T00:00:00Z`):null;if(input.dueAt===undefined)t.dueAt=null;}if(input.dueAt!==undefined){t.dueAt=s.due.at?new Date(s.due.at):null;if(input.dueDate===undefined)t.dueDate=null;}if(input.recurrenceRule!==undefined)t.recurrenceRule=input.recurrenceRule;if(input.projectId!==undefined)t.projectId=input.projectId;if(input.addTagIds)for(const tagId of input.addTagIds)if(!t.tagIds.includes(tagId))t.tagIds.push(tagId);if(input.removeTagIds)t.tagIds=t.tagIds.filter((x)=>!input.removeTagIds!.includes(x));t.revision+=1;t.updatedAt=new Date();out.push(toTaskRecord(t));}return out;},
+      search:async(userId,query)=>{ensureUser(userId);const q=query.toLowerCase();return [...tasks.values()].filter((t)=>{if(t.userId!==userId||t.deletedAt)return false;const p=t.projectId?projects.get(t.projectId)?.name??"":"";const tagNames=t.tagIds.map((id)=>tags.get(id)?.name??"").join(" ");const bodies=[...comments.values()].filter((c)=>c.taskId===t.id&&!c.deletedAt).map((c)=>c.body).join(" ");return[t.title,t.description??"",p,tagNames,bodies].some((v)=>v.toLowerCase().includes(q));}).map(toTaskRecord);},
+      captureSnapshot:async(userId,id)=>{ensureUser(userId);return taskSnapshot(getTask(userId,id,true));},
+      restoreSnapshot:async(userId,snapshot)=>{ensureUser(userId);restore(getTask(userId,snapshot.taskId,true),snapshot);},
     },
-    views: {
-      inbox: async(userId)=>{ensureUser(userId);return [...tasks.values()].filter((t)=>t.userId===userId&&!t.deletedAt).map(toTaskRecord).filter(isTaskInInbox);},
-      today: async(userId,now,tz)=>{ensureUser(userId);return sortTasksForView([...tasks.values()].filter((t)=>t.userId===userId&&!t.deletedAt).map(toTaskRecord).filter((t)=>isTaskDueToday(t,now,tz)),"today",now);},
-      upcoming: async(userId,now,tz)=>{ensureUser(userId);return sortTasksForView([...tasks.values()].filter((t)=>t.userId===userId&&!t.deletedAt).map(toTaskRecord).filter((t)=>isTaskUpcoming(t,now,tz)),"upcoming",now);},
-      overdue: async(userId,now,tz)=>{ensureUser(userId);return sortTasksForView([...tasks.values()].filter((t)=>t.userId===userId&&!t.deletedAt).map(toTaskRecord).filter((t)=>isTaskOverdue(t,now,tz)),"overdue",now);},
-      completed: async(userId)=>{ensureUser(userId);return [...tasks.values()].filter((t)=>t.userId===userId&&!t.deletedAt).map(toTaskRecord).filter(isTaskCompleted).sort((a,b)=>(b.completedAt??"").localeCompare(a.completedAt??""));},
-      focus: async(userId,now,tz)=>{ensureUser(userId);return sortTasksForView([...tasks.values()].filter((t)=>t.userId===userId&&!t.deletedAt).map(toTaskRecord).filter((t)=>isTaskFocus(t,now,tz)),"focus",now);},
+    views:{
+      inbox:async(userId,includeCompleted=false)=>{ensureUser(userId);return [...tasks.values()].filter((t)=>t.userId===userId&&!t.deletedAt&&t.projectId===null).map(toTaskRecord).filter((t)=>statusAllowed(t,includeCompleted));},
+      today:async(userId,now,tz,includeCompleted=false)=>{ensureUser(userId);const date=new Intl.DateTimeFormat("en-CA",{timeZone:tz,year:"numeric",month:"2-digit",day:"2-digit"}).format(now);return sortTasksForView([...tasks.values()].filter((t)=>t.userId===userId&&!t.deletedAt).map(toTaskRecord).filter((t)=>statusAllowed(t,includeCompleted)&&taskViewDate(t,tz)===date),"today",now);},
+      upcoming:async(userId,now,tz,includeCompleted=false)=>{ensureUser(userId);const date=new Intl.DateTimeFormat("en-CA",{timeZone:tz,year:"numeric",month:"2-digit",day:"2-digit"}).format(now);return sortTasksForView([...tasks.values()].filter((t)=>t.userId===userId&&!t.deletedAt).map(toTaskRecord).filter((t)=>statusAllowed(t,includeCompleted)&&((taskViewDate(t,tz)??"")>date)),"upcoming",now);},
+      overdue:async(userId,now,tz)=>{ensureUser(userId);return sortTasksForView([...tasks.values()].filter((t)=>t.userId===userId&&!t.deletedAt).map(toTaskRecord).filter((t)=>isTaskOverdue(t,now,tz)),"overdue",now);},
+      completed:async(userId)=>{ensureUser(userId);return [...tasks.values()].filter((t)=>t.userId===userId&&!t.deletedAt&&t.status==="COMPLETED").map(toTaskRecord).sort((a,b)=>(b.completedAt??"").localeCompare(a.completedAt??""));},
+      focus:async(userId,now,tz)=>{ensureUser(userId);return sortTasksForView([...tasks.values()].filter((t)=>t.userId===userId&&!t.deletedAt).map(toTaskRecord).filter((t)=>isTaskFocus(t,now,tz)),"focus",now);},
     },
-    projects: {
-      list: async(userId)=>{ensureUser(userId);return [...projects.values()].filter((p)=>p.userId===userId&&!p.deletedAt&&p.status!=="ARCHIVED").sort((a,b)=>a.sortOrder-b.sortOrder).map((p)=>serializeProject(p as never));},
-      create: async(userId,input)=>{ensureUser(userId);const p:DbProject={id:cuid(),userId,name:input.name,description:input.description??null,color:input.color??null,icon:input.icon??null,status:"ACTIVE",sortOrder:0,createdAt:new Date(),updatedAt:new Date(),archivedAt:null,deletedAt:null};projects.set(p.id,p);return serializeProject(p as never);},
-      get: async(userId,id)=>serializeProject(getProject(userId,id) as never),
-      update: async(userId,id,input)=>{const p=getProject(userId,id);if(input.name!==undefined)p.name=input.name;if(input.description!==undefined)p.description=input.description;if(input.color!==undefined)p.color=input.color;if(input.icon!==undefined)p.icon=input.icon;if(input.status!==undefined)p.status=input.status.toUpperCase() as DbProject["status"];p.updatedAt=new Date();return serializeProject(p as never);},
-      archive: async(userId,id)=>{const p=getProject(userId,id);p.status="ARCHIVED";p.archivedAt=new Date();p.updatedAt=new Date();return serializeProject(p as never);},
-      delete: async(userId,id)=>{const p=getProject(userId,id);p.deletedAt=new Date();p.updatedAt=new Date();},
+    projects:{
+      list:async(userId)=>{ensureUser(userId);return [...projects.values()].filter((p)=>p.userId===userId&&!p.deletedAt&&p.status!=="ARCHIVED").sort((a,b)=>a.sortOrder-b.sortOrder).map((p)=>serializeProject(p as never));},
+      create:async(userId,input)=>{ensureUser(userId);const p:DbProject={id:cuid(),userId,name:input.name,description:input.description??null,color:input.color??null,icon:input.icon??null,status:"ACTIVE",sortOrder:0,createdAt:new Date(),updatedAt:new Date(),archivedAt:null,deletedAt:null};projects.set(p.id,p);return serializeProject(p as never);},
+      get:async(userId,id)=>serializeProject(getProject(userId,id) as never),
+      update:async(userId,id,input)=>{const p=getProject(userId,id);if(input.name!==undefined)p.name=input.name;if(input.description!==undefined)p.description=input.description;if(input.color!==undefined)p.color=input.color;if(input.icon!==undefined)p.icon=input.icon;if(input.status!==undefined)p.status=input.status.toUpperCase() as DbProject["status"];p.updatedAt=new Date();return serializeProject(p as never);},
+      archive:async(userId,id)=>{const p=getProject(userId,id);p.status="ARCHIVED";p.archivedAt=new Date();p.updatedAt=new Date();return serializeProject(p as never);},
+      delete:async(userId,id)=>{const p=getProject(userId,id);p.deletedAt=new Date();p.updatedAt=new Date();},
     },
-    sections: {
-      list: async(userId,projectId)=>{ensureUser(userId);getProject(userId,projectId);return [...sections.values()].filter((s)=>s.projectId===projectId&&!s.deletedAt).sort((a,b)=>a.sortOrder-b.sortOrder).map((s)=>serializeSection(s as never));},
-      create: async(userId,input)=>{ensureUser(userId);getProject(userId,input.projectId);const s:DbSection={id:cuid(),projectId:input.projectId,name:input.name,sortOrder:0,createdAt:new Date(),updatedAt:new Date(),deletedAt:null};sections.set(s.id,s);return serializeSection(s as never);},
-      update: async(userId,projectId,id,input)=>{getProject(userId,projectId);const s=getSection(userId,id);if(s.projectId!==projectId)throw Errors.NotFound("Section");if(input.name!==undefined)s.name=input.name;if(input.sortOrder!==undefined)s.sortOrder=input.sortOrder;s.updatedAt=new Date();return serializeSection(s as never);},
-      delete: async(userId,projectId,id)=>{getProject(userId,projectId);const s=getSection(userId,id);if(s.projectId!==projectId)throw Errors.NotFound("Section");s.deletedAt=new Date();s.updatedAt=new Date();for(const t of tasks.values())if(t.sectionId===id)t.sectionId=null;},
+    tags:{
+      list:async(userId)=>{ensureUser(userId);return [...tags.values()].filter((t)=>t.userId===userId&&!t.deletedAt).sort((a,b)=>a.name.localeCompare(b.name)).map(serializeTag);},
+      create:async(userId,input)=>{ensureUser(userId);for(const t of tags.values())if(t.userId===userId&&!t.deletedAt&&t.name===input.name)throw Errors.Conflict(`Tag "${input.name}" already exists.`);const t:DbTag={id:cuid(),userId,name:input.name,color:input.color??null,createdAt:new Date(),updatedAt:new Date(),deletedAt:null};tags.set(t.id,t);return serializeTag(t);},
+      update:async(userId,id,input)=>{const t=getTag(userId,id);if(input.name!==undefined)t.name=input.name;if(input.color!==undefined)t.color=input.color;t.updatedAt=new Date();return serializeTag(t);},
+      delete:async(userId,id)=>{const t=getTag(userId,id);t.deletedAt=new Date();t.updatedAt=new Date();for(const task of tasks.values())task.tagIds=task.tagIds.filter((x)=>x!==id);},
+      getByName:async(userId,name)=>{ensureUser(userId);const t=[...tags.values()].find((x)=>x.userId===userId&&!x.deletedAt&&x.name===name);return t?serializeTag(t):null;},
+      verifyBelongToUser:async(userId,ids)=>{ensureUser(userId);for(const id of ids)getTag(userId,id);},
     },
-    tags: {
-      list: async(userId)=>{ensureUser(userId);return [...tags.values()].filter((t)=>t.userId===userId&&!t.deletedAt).sort((a,b)=>a.name.localeCompare(b.name)).map((t)=>serializeTag(t));},
-      create: async(userId,input)=>{ensureUser(userId);for(const t of tags.values())if(t.userId===userId&&!t.deletedAt&&t.name===input.name)throw Errors.Conflict(`Tag "${input.name}" already exists.`);const t:DbTag={id:cuid(),userId,name:input.name,color:input.color??null,createdAt:new Date(),updatedAt:new Date(),deletedAt:null};tags.set(t.id,t);return serializeTag(t);},
-      update: async(userId,id,input)=>{const t=getTag(userId,id);if(input.name!==undefined){for(const other of tags.values())if(other.id!==id&&other.userId===userId&&!other.deletedAt&&other.name===input.name)throw Errors.Conflict(`Tag "${input.name}" already exists.`);t.name=input.name;}if(input.color!==undefined)t.color=input.color;t.updatedAt=new Date();return serializeTag(t);},
-      delete: async(userId,id)=>{const t=getTag(userId,id);t.deletedAt=new Date();t.updatedAt=new Date();for(const task of tasks.values())task.tagIds=task.tagIds.filter((x)=>x!==id);},
-      getByName: async(userId,name)=>{ensureUser(userId);const t=[...tags.values()].find((t)=>t.userId===userId&&!t.deletedAt&&t.name===name);return t?serializeTag(t):null;},
-      verifyBelongToUser: async(userId,ids)=>{ensureUser(userId);for(const id of ids)getTag(userId,id);},
+    comments:{
+      list:async(userId,taskId)=>{ensureUser(userId);getTask(userId,taskId);return [...comments.values()].filter((c)=>c.taskId===taskId&&c.userId===userId&&!c.deletedAt).sort((a,b)=>a.createdAt.getTime()-b.createdAt.getTime()).map((c)=>serializeComment(c as never));},
+      create:async(userId,taskId,input)=>{ensureUser(userId);getTask(userId,taskId);const c:DbComment={id:cuid(),taskId,userId,body:input.body,deletedAt:null,createdAt:new Date(),updatedAt:new Date()};comments.set(c.id,c);return serializeComment(c as never);},
+      update:async(userId,taskId,id,input)=>{const c=getComment(userId,taskId,id);c.body=input.body;c.updatedAt=new Date();return serializeComment(c as never);},
+      delete:async(userId,taskId,id)=>{const c=getComment(userId,taskId,id);c.deletedAt=new Date();c.updatedAt=new Date();},
     },
-    comments: {
-      list: async(userId,taskId)=>{ensureUser(userId);getTask(userId,taskId);return [...comments.values()].filter((c)=>c.taskId===taskId&&c.userId===userId&&!c.deletedAt).sort((a,b)=>a.createdAt.getTime()-b.createdAt.getTime()).map((c)=>serializeComment(c as never));},
-      create: async(userId,taskId,input)=>{ensureUser(userId);getTask(userId,taskId);const c:DbComment={id:cuid(),taskId,userId,body:input.body,deletedAt:null,createdAt:new Date(),updatedAt:new Date()};comments.set(c.id,c);return serializeComment(c as never);},
-      update: async(userId,taskId,id,input)=>{const c=getComment(userId,taskId,id);c.body=input.body;c.updatedAt=new Date();return serializeComment(c as never);},
-      delete: async(userId,taskId,id)=>{const c=getComment(userId,taskId,id);c.deletedAt=new Date();c.updatedAt=new Date();},
+    reminders:{
+      list:async(userId,taskId)=>{ensureUser(userId);getTask(userId,taskId);return taskReminders(taskId).map((r)=>serializeReminder(r as never));},
+      create:async(userId,taskId,input)=>{ensureUser(userId);getTask(userId,taskId);const r:DbReminder={id:cuid(),taskId,userId,remindAt:new Date(input.remindAt),channel:input.channel??"hermes_telegram",status:"pending",createdAt:new Date(),updatedAt:new Date(),deletedAt:null};reminders.set(r.id,r);return serializeReminder(r as never);},
+      update:async(userId,id,input)=>{const r=getReminder(userId,id);if(input.remindAt!==undefined)r.remindAt=new Date(input.remindAt);if(input.channel!==undefined)r.channel=input.channel;if(input.status!==undefined)r.status=input.status;r.updatedAt=new Date();return serializeReminder(r as never);},
+      delete:async(userId,id)=>{const r=getReminder(userId,id);r.deletedAt=new Date();r.updatedAt=new Date();},
     },
-    reminders: {
-      list: async(userId,taskId)=>{ensureUser(userId);getTask(userId,taskId);return [...reminders.values()].filter((r)=>r.userId===userId&&r.taskId===taskId&&!r.deletedAt).sort((a,b)=>a.remindAt.getTime()-b.remindAt.getTime()).map((r)=>serializeReminder(r as never));},
-      create: async(userId,taskId,input)=>{ensureUser(userId);getTask(userId,taskId);const r:DbReminder={id:cuid(),taskId,userId,remindAt:new Date(input.remindAt),channel:input.channel??"push",status:"pending",createdAt:new Date(),updatedAt:new Date(),deletedAt:null};reminders.set(r.id,r);return serializeReminder(r as never);},
-      update: async(userId,id,input)=>{const r=getReminder(userId,id);if(input.remindAt!==undefined)r.remindAt=new Date(input.remindAt);if(input.channel!==undefined)r.channel=input.channel;if(input.status!==undefined)r.status=input.status;r.updatedAt=new Date();return serializeReminder(r as never);},
-      delete: async(userId,id)=>{const r=getReminder(userId,id);r.deletedAt=new Date();r.updatedAt=new Date();},
+    events:{
+      list:async(userId,taskId)=>{ensureUser(userId);if(taskId)getTask(userId,taskId,true);return [...events.values()].filter((e)=>e.userId===userId&&(!taskId||e.taskId===taskId)).sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime()).slice(0,100).map((e)=>serializeTaskEvent(e as never));},
+      record:async(userId,taskId,kind,payload)=>{ensureUser(userId);getTask(userId,taskId,true);const e:DbEvent={id:cuid(),userId,taskId,kind,payload:payload??null,createdAt:new Date()};events.set(e.id,e);return serializeTaskEvent(e as never);},
     },
-    events: {
-      list: async(userId,taskId)=>{ensureUser(userId);if(taskId)getTask(userId,taskId,true);return [...events.values()].filter((e)=>e.userId===userId&&(!taskId||e.taskId===taskId)).sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime()).slice(0,100).map((e)=>serializeTaskEvent(e as never));},
-      record: async(userId,taskId,kind,payload)=>{ensureUser(userId);getTask(userId,taskId,true);const e:DbEvent={id:cuid(),userId,taskId,kind,payload:payload??null,createdAt:new Date()};events.set(e.id,e);return serializeTaskEvent(e as never);},
-    },
-    operations: {
-      record: async(userId,kind,payload,taskId)=>{ensureUser(userId);const o:DbOperation={id:cuid(),userId,taskId:taskId??null,kind,payload,undoneAt:null,createdAt:new Date(),sequence:++operationSequence};operations.set(o.id,o);return serializeOperation(o as never);},
-      list: async(userId)=>{ensureUser(userId);return [...operations.values()].filter((o)=>o.userId===userId).sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime()||b.sequence-a.sequence).slice(0,3).map((o)=>serializeOperation(o as never));},
-      undoLast: async(userId)=>{ensureUser(userId);const o=[...operations.values()].filter((o)=>o.userId===userId&&!o.undoneAt).sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime()||b.sequence-a.sequence)[0];if(!o)throw Errors.NotFound("Operation");return repo.operations.undo(userId,o.id);},
-      undo: async(userId,id)=>{ensureUser(userId);const o=operations.get(id);if(!o||o.userId!==userId)throw Errors.NotFound("Operation");if(o.undoneAt)throw Errors.Conflict("Operation already undone.");const payload=o.payload as Record<string,unknown>;let redoSnapshots:TaskSnapshot[]=[];if(o.kind==="TASK_CREATE"){const taskId=payload.taskId as string;redoSnapshots=[await repo.tasks.captureSnapshot(userId,taskId)];const t=getTask(userId,taskId,true);t.deletedAt=new Date();t.revision+=1;t.updatedAt=new Date();}else if(["TASK_UPDATE","TASK_DELETE","TASK_COMPLETE","TASK_REOPEN"].includes(o.kind)){const original=payload as unknown as TaskSnapshot;redoSnapshots=[await repo.tasks.captureSnapshot(userId,original.taskId)];await repo.tasks.restoreSnapshot(userId,original);}else if(["TASK_BULK_UPDATE","TASK_BULK_COMPLETE","TASK_BULK_DELETE","TASK_BULK_MOVE"].includes(o.kind)){const originals=(payload.snapshots as TaskSnapshot[]??[]);redoSnapshots=await Promise.all(originals.map((snapshot)=>repo.tasks.captureSnapshot(userId,snapshot.taskId)));for(const snapshot of originals)await repo.tasks.restoreSnapshot(userId,snapshot);}else throw Errors.Validation(`Undo not supported for operation kind: ${o.kind}`);o.payload={...payload,redoSnapshots};o.undoneAt=new Date();return serializeOperation(o as never);},
-      redoLast: async(userId)=>{ensureUser(userId);const o=[...operations.values()].filter((o)=>o.userId===userId&&o.undoneAt).sort((a,b)=>(b.undoneAt?.getTime()??0)-(a.undoneAt?.getTime()??0)||a.sequence-b.sequence)[0];if(!o)throw Errors.NotFound("Operation");return repo.operations.redo(userId,o.id);},
-      redo: async(userId,id)=>{ensureUser(userId);const o=operations.get(id);if(!o||o.userId!==userId)throw Errors.NotFound("Operation");if(!o.undoneAt)throw Errors.Conflict("Operation is not undone.");const payload=o.payload as Record<string,unknown>;const redoSnapshots=(payload.redoSnapshots as TaskSnapshot[]??[]);if(!redoSnapshots.length)throw Errors.Conflict("Operation cannot be redone.");for(const snapshot of redoSnapshots)await repo.tasks.restoreSnapshot(userId,snapshot);o.undoneAt=null;return serializeOperation(o as never);},
+    operations:{
+      record:async(userId,kind,payload,taskId)=>{ensureUser(userId);const o:DbOperation={id:cuid(),userId,taskId:taskId??null,kind,payload,undoneAt:null,createdAt:new Date(),sequence:++operationSequence};operations.set(o.id,o);return serializeOperation(o as never);},
+      list:async(userId)=>{ensureUser(userId);return [...operations.values()].filter((o)=>o.userId===userId).sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime()||b.sequence-a.sequence).slice(0,3).map((o)=>serializeOperation(o as never));},
+      undoLast:async(userId)=>{const o=[...operations.values()].filter((x)=>x.userId===userId&&!x.undoneAt).sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime()||b.sequence-a.sequence)[0];if(!o)throw Errors.NotFound("Operation");return repo.operations.undo(userId,o.id);},
+      undo:async(userId,id)=>{ensureUser(userId);const o=operations.get(id);if(!o||o.userId!==userId)throw Errors.NotFound("Operation");if(o.undoneAt)throw Errors.Conflict("Operation already undone.");const p=o.payload as Record<string,unknown>;let originals:TaskSnapshot[]=[];let spawned:string[]=[];if(o.kind==="TASK_CREATE"){const taskId=p.taskId as string;const redoSnapshots=[await repo.tasks.captureSnapshot(userId,taskId)];getTask(userId,taskId,true).deletedAt=new Date();o.payload={...p,redoSnapshots};o.undoneAt=new Date();return serializeOperation(o as never);}if(o.kind==="TASK_COMPLETE"){originals=[(p.snapshot as TaskSnapshot)??(p as unknown as TaskSnapshot)];spawned=(p.spawnedTaskIds as string[])??[];}else if(["TASK_UPDATE","TASK_DELETE","TASK_REOPEN"].includes(o.kind)){originals=[(p.snapshot as TaskSnapshot)??(p as unknown as TaskSnapshot)];}else if(["TASK_BULK_UPDATE","TASK_BULK_COMPLETE","TASK_BULK_DELETE","TASK_BULK_MOVE"].includes(o.kind)){originals=(p.snapshots as TaskSnapshot[])??[];spawned=(p.spawnedTaskIds as string[])??[];}else throw Errors.Validation(`Undo not supported for operation kind: ${o.kind}`);const redoSnapshots=await Promise.all([...originals.map((s)=>s.taskId),...spawned].map((taskId)=>repo.tasks.captureSnapshot(userId,taskId)));for(const s of originals)await repo.tasks.restoreSnapshot(userId,s);for(const taskId of spawned){const t=getTask(userId,taskId,true);t.deletedAt=new Date();t.revision+=1;t.updatedAt=new Date();}o.payload={...p,redoSnapshots};o.undoneAt=new Date();return serializeOperation(o as never);},
+      redoLast:async(userId)=>{const o=[...operations.values()].filter((x)=>x.userId===userId&&x.undoneAt).sort((a,b)=>(b.undoneAt?.getTime()??0)-(a.undoneAt?.getTime()??0)||a.sequence-b.sequence)[0];if(!o)throw Errors.NotFound("Operation");return repo.operations.redo(userId,o.id);},
+      redo:async(userId,id)=>{ensureUser(userId);const o=operations.get(id);if(!o||o.userId!==userId)throw Errors.NotFound("Operation");if(!o.undoneAt)throw Errors.Conflict("Operation is not undone.");const p=o.payload as Record<string,unknown>;const redo=(p.redoSnapshots as TaskSnapshot[])??[];if(!redo.length)throw Errors.Conflict("Operation cannot be redone.");for(const s of redo)await repo.tasks.restoreSnapshot(userId,s);o.undoneAt=null;return serializeOperation(o as never);},
     },
   };
   return repo;

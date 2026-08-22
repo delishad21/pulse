@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CalendarClock, Check, FolderInput, RotateCcw, RotateCw, Trash2, X } from "lucide-react";
 import { useTasks, useTaskView, useBulkTasks, useBulkMoveTasks, useBulkRescheduleTasks } from "@/hooks/use-tasks";
-import { useProjects, useSections } from "@/hooks/use-projects";
+import { useProjects } from "@/hooks/use-projects";
 import { useUndo, useRedo, useHistory } from "@/hooks/use-history";
 import { TaskList } from "./task-list";
 import { Shell } from "./shell";
@@ -35,8 +35,9 @@ function getTasksQuery(filter: DashboardFilter) {
 
 export function Dashboard({ title, filter, header }: DashboardProps) {
   const canonicalView = filter.type === "inbox" || filter.type === "today" ? filter.type : null;
+  const [showCompleted, setShowCompleted] = useState(false);
   const listQuery = useTasks(getTasksQuery(filter), canonicalView === null);
-  const viewQuery = useTaskView(canonicalView ?? "inbox", canonicalView !== null);
+  const viewQuery = useTaskView(canonicalView ?? "inbox", canonicalView !== null, showCompleted);
   const tasksQuery = canonicalView ? viewQuery : listQuery;
   const tasks = tasksQuery.data;
   const isLoading = tasksQuery.isLoading;
@@ -49,9 +50,7 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
   const { data: history } = useHistory();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [moveProjectId, setMoveProjectId] = useState("");
-  const [moveSectionId, setMoveSectionId] = useState("");
   const [bulkDueDate, setBulkDueDate] = useState("");
-  const { data: moveSections } = useSections(moveProjectId || null);
 
   const filtered = tasks
     ? (filter.type === "inbox" || filter.type === "today")
@@ -77,7 +76,7 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
   const runBulkMove = () => {
     if (selectedIds.length === 0) return;
     bulkMove.mutate(
-      { ids: selectedIds, projectId: moveProjectId || null, sectionId: moveProjectId ? (moveSectionId || null) : null },
+      { ids: selectedIds, projectId: moveProjectId || null },
       { onSuccess: () => setSelectedIds([]) },
     );
   };
@@ -109,6 +108,7 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
           </div>
 
           <div className="flex items-center gap-1 rounded-lg border border-stroke bg-surface p-1 shadow-sm">
+            {canonicalView ? <button type="button" onClick={() => setShowCompleted((value) => !value)} aria-pressed={showCompleted} className="h-9 rounded-md px-3 text-xs font-semibold text-muted transition hover:bg-surface-subtle hover:text-ink">{showCompleted ? "Hide completed" : "Show completed"}</button> : null}
             <button
               type="button"
               onClick={() => undo.mutate()}
@@ -149,18 +149,13 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
               <select
                 aria-label="Move selected tasks to project"
                 value={moveProjectId}
-                onChange={(event) => { setMoveProjectId(event.target.value); setMoveSectionId(""); }}
+                onChange={(event) => setMoveProjectId(event.target.value)}
                 className="min-w-0 flex-1 bg-transparent px-1 text-sm text-ink outline-none"
               >
                 <option value="">Inbox</option>
                 {projects?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
               </select>
-              {moveProjectId && moveSections?.length ? (
-                <select aria-label="Move selected tasks to section" value={moveSectionId} onChange={(event) => setMoveSectionId(event.target.value)} className="min-w-0 bg-transparent px-1 text-sm text-ink outline-none">
-                  <option value="">No section</option>
-                  {moveSections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
-                </select>
-              ) : null}
+
               <button type="button" onClick={runBulkMove} className="rounded-md px-2 py-1.5 text-xs font-bold text-primary hover:bg-primary-soft">Move</button>
             </div>
 

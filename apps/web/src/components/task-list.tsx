@@ -119,7 +119,10 @@ function SortableTaskRow({ task, selected, onSelect, reorderable }: {
               {task.priority !== "none" ? (
                 <span className="inline-flex items-center gap-1.5 capitalize"><span className={cn("size-1.5 rounded-full", priorityClass(task.priority))} />{task.priority}</span>
               ) : null}
-              {task.tags.map((tag) => <span key={tag.id} className="inline-flex items-center gap-1"><Tag className="size-3" />+{tag.name}</span>)}
+              {task.tags.map((tag) => <span key={tag.id} className="inline-flex items-center gap-1"><Tag className="size-3" />@{tag.name}</span>)}
+              {task.startAt ? (
+                <span className="inline-flex items-center gap-1 text-muted"><Clock3 className="size-3.5" />{new Date(task.startAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}{task.endAt ? `–${new Date(task.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
+              ) : null}
               {task.due.date ? (
                 <span className={cn("inline-flex items-center gap-1", isOverdue(task.due.date) ? "text-danger" : isToday(task.due.date) ? "text-primary" : "text-muted")}>
                   <CalendarDays className="size-3.5" />{isToday(task.due.date) ? "Today" : formatDate(task.due.date)}
@@ -175,12 +178,8 @@ export function TaskList({ tasks, selectedIds, onSelect, reorderable = false }: 
     const oldIndex = orderedTasks.findIndex((task) => task.id === active.id);
     const newIndex = orderedTasks.findIndex((task) => task.id === over.id);
     if (oldIndex < 0 || newIndex < 0) return;
-    const activeTask = orderedTasks[oldIndex];
-    const overTask = orderedTasks[newIndex];
-    if (activeTask.sectionId !== overTask.sectionId) return;
     const next = arrayMove(orderedTasks, oldIndex, newIndex);
-    const sameSection = next.filter((task) => task.sectionId === activeTask.sectionId);
-    reorder.mutate(sameSection.map((task, index) => ({ id: task.id, sortOrder: (index + 1) * 1000 })));
+    reorder.mutate(next.map((task, index) => ({ id: task.id, sortOrder: (index + 1) * 1000 })));
   };
 
   return (

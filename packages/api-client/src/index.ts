@@ -5,7 +5,6 @@ import type {
   Project,
   ProjectStatus,
   Reminder,
-  Section,
   Tag,
   Task,
   TaskEvent,
@@ -16,54 +15,56 @@ export interface PulseApiClientOptions {
   getAccessToken?: () => Promise<string | null>;
 }
 
+export interface TaskReminderInput { remindAt: string; channel?: string; }
+
 export interface CreateTaskInput {
   title: string;
   description?: string | null;
   priority?: Priority;
+  startAt?: string | null;
+  endAt?: string | null;
   dueDate?: string | null;
   dueAt?: string | null;
-  reminderAt?: string | null;
   recurrenceRule?: string | null;
   projectId?: string | null;
-  sectionId?: string | null;
   parentTaskId?: string | null;
   sortOrder?: number;
   tagIds?: string[];
+  reminders?: TaskReminderInput[];
 }
 
 export interface UpdateTaskInput {
   title?: string;
   description?: string | null;
   priority?: Priority;
+  startAt?: string | null;
+  endAt?: string | null;
   dueDate?: string | null;
   dueAt?: string | null;
-  reminderAt?: string | null;
   recurrenceRule?: string | null;
   projectId?: string | null;
-  sectionId?: string | null;
   parentTaskId?: string | null;
   sortOrder?: number;
   tagIds?: string[];
+  reminders?: TaskReminderInput[];
 }
 
 export interface BulkUpdateInput {
   ids: string[];
   title?: string;
   priority?: Priority;
+  startAt?: string | null;
+  endAt?: string | null;
   dueDate?: string | null;
   dueAt?: string | null;
-  reminderAt?: string | null;
   recurrenceRule?: string | null;
   projectId?: string | null;
-  sectionId?: string | null;
   addTagIds?: string[];
   removeTagIds?: string[];
 }
 
 export interface CreateProjectInput { name: string; description?: string | null; color?: string | null; icon?: string | null; }
 export interface UpdateProjectInput extends Partial<CreateProjectInput> { status?: ProjectStatus; }
-export interface CreateSectionInput { projectId: string; name: string; }
-export interface UpdateSectionInput { name?: string; sortOrder?: number; }
 export interface CreateTagInput { name: string; color?: string | null; }
 export interface UpdateTagInput { name?: string; color?: string | null; }
 export interface CreateCommentInput { body: string; }
@@ -110,19 +111,19 @@ export class PulseApiClient {
   completeTask(id: string): Promise<Task> { return this.request("POST", `/api/tasks/${id}/complete`); }
   reopenTask(id: string): Promise<Task> { return this.request("POST", `/api/tasks/${id}/reopen`); }
   cancelTask(id: string): Promise<Task> { return this.request("POST", `/api/tasks/${id}/cancel`); }
-  moveTask(id: string, input: { projectId: string | null; sectionId?: string | null }): Promise<Task> { return this.request("POST", `/api/tasks/${id}/move`, input); }
-  rescheduleTask(id: string, input: Pick<UpdateTaskInput, "dueDate" | "dueAt" | "reminderAt" | "recurrenceRule">): Promise<Task> { return this.request("POST", `/api/tasks/${id}/reschedule`, input); }
+  moveTask(id: string, input: { projectId: string | null }): Promise<Task> { return this.request("POST", `/api/tasks/${id}/move`, input); }
+  rescheduleTask(id: string, input: Pick<UpdateTaskInput, "startAt" | "endAt" | "dueDate" | "dueAt" | "recurrenceRule" | "reminders">): Promise<Task> { return this.request("POST", `/api/tasks/${id}/reschedule`, input); }
   setTaskLabels(id: string, tagIds: string[]): Promise<Task> { return this.request("POST", `/api/tasks/${id}/labels`, { tagIds }); }
   bulkComplete(input: { ids: string[] }): Promise<Task[]> { return this.request("POST", "/api/tasks/bulk/complete", input); }
   bulkDelete(input: { ids: string[] }): Promise<void> { return this.request("POST", "/api/tasks/bulk/delete", input); }
   bulkUpdate(input: BulkUpdateInput): Promise<Task[]> { return this.request("POST", "/api/tasks/bulk/update", input); }
-  bulkMove(input: { ids: string[]; projectId: string | null; sectionId?: string | null }): Promise<Task[]> { return this.request("POST", "/api/tasks/bulk/move", input); }
-  bulkReschedule(input: { ids: string[]; dueDate?: string | null; dueAt?: string | null; reminderAt?: string | null }): Promise<Task[]> { return this.request("POST", "/api/tasks/bulk/reschedule", input); }
+  bulkMove(input: { ids: string[]; projectId: string | null }): Promise<Task[]> { return this.request("POST", "/api/tasks/bulk/move", input); }
+  bulkReschedule(input: { ids: string[]; startAt?: string | null; endAt?: string | null; dueDate?: string | null; dueAt?: string | null }): Promise<Task[]> { return this.request("POST", "/api/tasks/bulk/reschedule", input); }
   bulkReorder(input: { updates: Array<{ id: string; sortOrder: number }> }): Promise<Task[]> { return this.request("POST", "/api/tasks/bulk/reorder", input); }
 
-  getInbox(): Promise<Task[]> { return this.request("GET", "/api/views/inbox"); }
-  getToday(): Promise<Task[]> { return this.request("GET", "/api/views/today"); }
-  getUpcoming(): Promise<Task[]> { return this.request("GET", "/api/views/upcoming"); }
+  getInbox(includeCompleted = false): Promise<Task[]> { return this.request("GET", `/api/views/inbox${includeCompleted ? "?includeCompleted=true" : ""}`); }
+  getToday(includeCompleted = false): Promise<Task[]> { return this.request("GET", `/api/views/today${includeCompleted ? "?includeCompleted=true" : ""}`); }
+  getUpcoming(includeCompleted = false): Promise<Task[]> { return this.request("GET", `/api/views/upcoming${includeCompleted ? "?includeCompleted=true" : ""}`); }
   getOverdue(): Promise<Task[]> { return this.request("GET", "/api/views/overdue"); }
   getCompleted(): Promise<Task[]> { return this.request("GET", "/api/views/completed"); }
   getFocus(): Promise<Task[]> { return this.request("GET", "/api/views/focus"); }
@@ -134,10 +135,6 @@ export class PulseApiClient {
   updateProject(id: string, input: UpdateProjectInput): Promise<Project> { return this.request("PATCH", `/api/projects/${id}`, input); }
   archiveProject(id: string): Promise<Project> { return this.request("POST", `/api/projects/${id}/archive`); }
   deleteProject(id: string): Promise<void> { return this.request("DELETE", `/api/projects/${id}`); }
-  listSections(projectId: string): Promise<Section[]> { return this.request("GET", `/api/projects/${projectId}/sections`); }
-  createSection(input: CreateSectionInput): Promise<Section> { return this.request("POST", `/api/projects/${input.projectId}/sections`, { name: input.name }); }
-  updateSection(projectId: string, sectionId: string, input: UpdateSectionInput): Promise<Section> { return this.request("PATCH", `/api/projects/${projectId}/sections/${sectionId}`, input); }
-  deleteSection(projectId: string, sectionId: string): Promise<void> { return this.request("DELETE", `/api/projects/${projectId}/sections/${sectionId}`); }
 
   listTags(): Promise<Tag[]> { return this.request("GET", "/api/tags"); }
   createTag(input: CreateTagInput): Promise<Tag> { return this.request("POST", "/api/tags", input); }
@@ -163,4 +160,4 @@ export class PulseApiClient {
   getTaskHistory(taskId: string): Promise<TaskEvent[]> { return this.request("GET", `/api/tasks/${taskId}/history`); }
 }
 
-export type { Comment, Operation, Project, Reminder, Section, Tag, Task, TaskEvent } from "@pulse/domain";
+export type { Comment, Operation, Project, Reminder, Tag, Task, TaskEvent } from "@pulse/domain";

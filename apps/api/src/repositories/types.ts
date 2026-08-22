@@ -1,7 +1,7 @@
-import type { Comment, Operation, Project, Reminder, Section, Tag, Task, TaskEvent, UserId } from "@pulse/domain";
-import type { BulkUpdateInput, CreateCommentInput, CreateProjectInput, CreateReminderInput, CreateSectionInput, CreateTagInput, CreateTaskInput, UpdateCommentInput, UpdateProjectInput, UpdateReminderInput, UpdateSectionInput, UpdateTagInput, UpdateTaskInput } from "@pulse/api-client";
+import type { Comment, Operation, Project, Reminder, Tag, Task, TaskEvent, UserId } from "@pulse/domain";
+import type { BulkUpdateInput, CreateCommentInput, CreateProjectInput, CreateReminderInput, CreateTagInput, CreateTaskInput, UpdateCommentInput, UpdateProjectInput, UpdateReminderInput, UpdateTagInput, UpdateTaskInput } from "@pulse/api-client";
 
-export interface TaskFilters { status?: "open" | "completed" | "cancelled"; projectId?: string; sectionId?: string; }
+export interface TaskFilters { status?: "open" | "completed" | "cancelled"; projectId?: string; }
 export interface TaskSnapshot { taskId: string; before: Record<string, unknown>; }
 
 export interface TaskRepository {
@@ -10,10 +10,10 @@ export interface TaskRepository {
   get(userId: UserId, id: string): Promise<Task>;
   update(userId: UserId, id: string, input: UpdateTaskInput): Promise<Task>;
   delete(userId: UserId, id: string): Promise<void>;
-  complete(userId: UserId, id: string): Promise<Task>;
+  complete(userId: UserId, id: string, completedAt: Date): Promise<Task>;
   reopen(userId: UserId, id: string): Promise<Task>;
   cancel(userId: UserId, id: string): Promise<Task>;
-  bulkComplete(userId: UserId, ids: string[]): Promise<Task[]>;
+  bulkComplete(userId: UserId, ids: string[], completedAt: Date): Promise<Task[]>;
   bulkDelete(userId: UserId, ids: string[]): Promise<void>;
   bulkUpdate(userId: UserId, input: BulkUpdateInput): Promise<Task[]>;
   search(userId: UserId, query: string): Promise<Task[]>;
@@ -22,9 +22,9 @@ export interface TaskRepository {
 }
 
 export interface ViewRepository {
-  inbox(userId: UserId): Promise<Task[]>;
-  today(userId: UserId, now: Date, timezone: string): Promise<Task[]>;
-  upcoming(userId: UserId, now: Date, timezone: string): Promise<Task[]>;
+  inbox(userId: UserId, includeCompleted?: boolean): Promise<Task[]>;
+  today(userId: UserId, now: Date, timezone: string, includeCompleted?: boolean): Promise<Task[]>;
+  upcoming(userId: UserId, now: Date, timezone: string, includeCompleted?: boolean): Promise<Task[]>;
   overdue(userId: UserId, now: Date, timezone: string): Promise<Task[]>;
   completed(userId: UserId): Promise<Task[]>;
   focus(userId: UserId, now: Date, timezone: string): Promise<Task[]>;
@@ -32,9 +32,6 @@ export interface ViewRepository {
 
 export interface ProjectRepository {
   list(userId: UserId): Promise<Project[]>; create(userId: UserId, input: CreateProjectInput): Promise<Project>; get(userId: UserId, id: string): Promise<Project>; update(userId: UserId, id: string, input: UpdateProjectInput): Promise<Project>; archive(userId: UserId, id: string): Promise<Project>; delete(userId: UserId, id: string): Promise<void>;
-}
-export interface SectionRepository {
-  list(userId: UserId, projectId: string): Promise<Section[]>; create(userId: UserId, input: CreateSectionInput): Promise<Section>; update(userId: UserId, projectId: string, id: string, input: UpdateSectionInput): Promise<Section>; delete(userId: UserId, projectId: string, id: string): Promise<void>;
 }
 export interface TagRepository {
   list(userId: UserId): Promise<Tag[]>; create(userId: UserId, input: CreateTagInput): Promise<Tag>; update(userId: UserId, id: string, input: UpdateTagInput): Promise<Tag>; delete(userId: UserId, id: string): Promise<void>; getByName(userId: UserId, name: string): Promise<Tag | null>; verifyBelongToUser(userId: UserId, ids: string[]): Promise<void>;
@@ -52,5 +49,5 @@ export interface OperationRepository {
   record(userId: UserId, kind: string, payload: unknown, taskId?: string): Promise<Operation>; list(userId: UserId): Promise<Operation[]>; undoLast(userId: UserId): Promise<Operation>; undo(userId: UserId, id: string): Promise<Operation>; redoLast(userId: UserId): Promise<Operation>; redo(userId: UserId, id: string): Promise<Operation>;
 }
 export interface PulseRepository {
-  tasks: TaskRepository; views: ViewRepository; projects: ProjectRepository; sections: SectionRepository; tags: TagRepository; comments: CommentRepository; reminders: ReminderRepository; events: EventRepository; operations: OperationRepository; healthCheck(): Promise<{ database: "connected" | "in-memory" | "disconnected" }>;
+  tasks: TaskRepository; views: ViewRepository; projects: ProjectRepository; tags: TagRepository; comments: CommentRepository; reminders: ReminderRepository; events: EventRepository; operations: OperationRepository; healthCheck(): Promise<{ database: "connected" | "in-memory" | "disconnected" }>;
 }

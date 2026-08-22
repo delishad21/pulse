@@ -15,7 +15,7 @@ export function useCreateReminder() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ taskId, remindAt }: { taskId: string; remindAt: string }) =>
-      apiClient.createReminder(taskId, { remindAt, channel: "in_app" }),
+      apiClient.createReminder(taskId, { remindAt, channel: "hermes_telegram" }),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: [remindersKey, variables.taskId] });
       void queryClient.invalidateQueries({ queryKey: ["tasks"] });

@@ -3,7 +3,8 @@ import test from "node:test";
 import { PulseApiClient } from "@pulse/api-client";
 import { buildApp } from "../src/server.js";
 import { createMemoryRepository } from "../src/repositories/memory.js";
-import { clearRepository } from "../src/repositories/registry.js";
+import { clearRepository, setRepository } from "../src/repositories/registry.js";
+import * as taskService from "../src/services/task-service.js";
 
 const TEST_USER = { id: "test_user_1", username: "test-user", name: "Test User", timezone: "UTC" };
 
@@ -106,24 +107,14 @@ test("complete and reopen task", async () => {
   }
 });
 
-test("projects and sections", async () => {
+test("projects are independent of removed sections", async () => {
   const { client, cleanup } = await createTestClient();
   try {
     const project = await client.createProject({ name: "API test project" });
     assert.equal(project.name, "API test project");
-
-    const section = await client.createSection({ projectId: project.id, name: "Section A" });
-    assert.equal(section.name, "Section A");
-    assert.equal(section.projectId, project.id);
-
-    const sections = await client.listSections(project.id);
-    assert.ok(sections.some((s) => s.id === section.id));
-
     const archived = await client.archiveProject(project.id);
     assert.equal(archived.status, "archived");
-  } finally {
-    await cleanup();
-  }
+  } finally { await cleanup(); }
 });
 
 test("tags and comments", async () => {
@@ -186,30 +177,23 @@ test("search across title and comments", async () => {
   }
 });
 
-test("title-only PATCH preserves schedule and undo restores original task", async () => {
+test("title-only PATCH preserves schedule, reminders and undo restores original task", async () => {
   const { client, cleanup } = await createTestClient();
   try {
     const original = await client.createTask({
-      title: "Scheduled task",
-      dueDate: "2099-03-04",
-      reminderAt: "2099-03-04T08:00:00.000Z",
-      recurrenceRule: "FREQ=WEEKLY;INTERVAL=1",
+      title: "Scheduled task", startAt: "2099-03-04T08:00:00.000Z", endAt: "2099-03-04T09:00:00.000Z",
+      dueDate: "2099-03-05", reminders: [
+        { remindAt: "2099-03-04T07:30:00.000Z" }, { remindAt: "2099-03-04T07:45:00.000Z", channel: "hermes_telegram" },
+      ], recurrenceRule: "FREQ=WEEKLY;INTERVAL=1",
     });
     const updated = await client.updateTask(original.id, { title: "Renamed only" });
-    assert.equal(updated.title, "Renamed only");
-    assert.equal(updated.due.date, "2099-03-04");
-    assert.equal(updated.reminderAt, "2099-03-04T08:00:00.000Z");
-    assert.equal(updated.recurrenceRule, "FREQ=WEEKLY;INTERVAL=1");
-
+    assert.equal(updated.title, "Renamed only"); assert.equal(updated.startAt, original.startAt); assert.equal(updated.endAt, original.endAt);
+    assert.equal(updated.due.date, "2099-03-05"); assert.equal(updated.reminders.length, 2); assert.equal(updated.recurrenceRule, original.recurrenceRule);
     await client.undoLast();
     const restored = await client.getTask(original.id);
-    assert.equal(restored.title, "Scheduled task");
-    assert.equal(restored.due.date, "2099-03-04");
-    assert.equal(restored.reminderAt, "2099-03-04T08:00:00.000Z");
-    assert.equal(restored.recurrenceRule, "FREQ=WEEKLY;INTERVAL=1");
-  } finally {
-    await cleanup();
-  }
+    assert.equal(restored.title, "Scheduled task"); assert.equal(restored.startAt, original.startAt); assert.equal(restored.endAt, original.endAt);
+    assert.deepEqual(restored.reminders.map(r=>r.remindAt), original.reminders.map(r=>r.remindAt));
+  } finally { await cleanup(); }
 });
 
 test("task sortOrder can be created and patched for persistent web ordering", async () => {
@@ -268,51 +252,63 @@ test("undo and redo restore both update and create operations", async () => {
   }
 });
 
-test("foreign project, section, parent and tag relations are rejected", async () => {
+test("foreign project, parent and label relations are rejected", async () => {
   const foreignUser = "foreign_user";
   const repository = createMemoryRepository(TEST_USER.id, [foreignUser]);
   const foreignProject = await repository.projects.create(foreignUser, { name: "Foreign project" });
-  const foreignSection = await repository.sections.create(foreignUser, { projectId: foreignProject.id, name: "Foreign section" });
   const foreignTag = await repository.tags.create(foreignUser, { name: "foreign-tag" });
   const foreignTask = await repository.tasks.create(foreignUser, { title: "Foreign parent" });
   const { client, cleanup } = await createTestClient(repository);
   try {
     await assert.rejects(() => client.createTask({ title: "Bad project", projectId: foreignProject.id }), /Project not found\./);
-    await assert.rejects(() => client.createTask({ title: "Bad section", sectionId: foreignSection.id }), /(Project|Section) not found\./);
     await assert.rejects(() => client.createTask({ title: "Bad parent", parentTaskId: foreignTask.id }), /Task not found\./);
-    await assert.rejects(() => client.createTask({ title: "Bad tag", tagIds: [foreignTag.id] }), /Tag not found\./);
-  } finally {
-    await cleanup();
-  }
+    await assert.rejects(() => client.createTask({ title: "Bad label", tagIds: [foreignTag.id] }), /(labels|Tag)/i);
+  } finally { await cleanup(); }
 });
 
-test("reminder, section, tag and comment CRUD", async () => {
+test("multiple reminders, labels and comments support CRUD", async () => {
   const { client, cleanup } = await createTestClient();
   try {
     const project = await client.createProject({ name: "CRUD project" });
-    const section = await client.createSection({ projectId: project.id, name: "Before" });
-    assert.equal((await client.updateSection(project.id, section.id, { name: "After", sortOrder: 2 })).name, "After");
     const tag = await client.createTag({ name: "crud-tag" });
     assert.equal((await client.updateTag(tag.id, { name: "crud-tag-updated" })).name, "crud-tag-updated");
-    const task = await client.createTask({ title: "CRUD task", projectId: project.id, sectionId: section.id, tagIds: [tag.id] });
+    const task = await client.createTask({ title: "CRUD task", projectId: project.id, tagIds: [tag.id], reminders: [
+      { remindAt: "2099-04-01T08:00:00.000Z" }, { remindAt: "2099-04-01T08:30:00.000Z" },
+    ] });
+    assert.equal(task.reminders.length, 2); assert.ok(task.reminders.every(r=>r.channel === "hermes_telegram"));
     const comment = await client.createComment(task.id, { body: "Before comment" });
     assert.equal((await client.updateComment(task.id, comment.id, { body: "After comment" })).body, "After comment");
-    await client.deleteComment(task.id, comment.id);
-    assert.equal((await client.listComments(task.id)).length, 0);
-    const reminder = await client.createReminder(task.id, { remindAt: "2099-04-01T09:00:00.000Z", channel: "push" });
+    await client.deleteComment(task.id, comment.id); assert.equal((await client.listComments(task.id)).length, 0);
+    const reminder = await client.createReminder(task.id, { remindAt: "2099-04-01T09:00:00.000Z" });
     const changed = await client.updateReminder(reminder.id, { remindAt: "2099-04-01T10:00:00.000Z", status: "sent" });
-    assert.equal(changed.remindAt, "2099-04-01T10:00:00.000Z");
-    assert.equal(changed.status, "sent");
-    assert.equal((await client.listReminders(task.id)).length, 1);
-    await client.deleteReminder(reminder.id);
-    assert.equal((await client.listReminders(task.id)).length, 0);
-    await client.deleteTag(tag.id);
-    assert.ok(!(await client.listTags()).some((t) => t.id === tag.id));
-    await client.deleteSection(project.id, section.id);
-    assert.equal((await client.listSections(project.id)).length, 0);
-  } finally {
-    await cleanup();
-  }
+    assert.equal(changed.remindAt, "2099-04-01T10:00:00.000Z"); assert.equal(changed.status, "sent"); assert.equal(changed.channel, "hermes_telegram");
+    assert.equal((await client.listReminders(task.id)).length, 3); await client.deleteReminder(reminder.id); assert.equal((await client.listReminders(task.id)).length, 2);
+    await client.deleteTag(tag.id); assert.ok(!(await client.listTags()).some(t=>t.id === tag.id));
+  } finally { await cleanup(); }
+});
+
+test("task defaults to none priority and partial schedule patches preserve invariants", async () => {
+  const { client, cleanup } = await createTestClient();
+  try {
+    const task = await client.createTask({ title: "Window", startAt: "2099-04-03T08:00:00.000Z", endAt: "2099-04-03T09:00:00.000Z", dueAt: "2099-04-03T12:00:00.000Z" });
+    assert.equal(task.priority, "none");
+    const endOnly = await client.updateTask(task.id, { endAt: "2099-04-03T10:00:00.000Z" });
+    assert.equal(endOnly.startAt, "2099-04-03T08:00:00.000Z"); assert.equal(endOnly.endAt, "2099-04-03T10:00:00.000Z");
+    const dateDeadline = await client.updateTask(task.id, { dueDate: "2099-04-04" });
+    assert.equal(dateDeadline.due.date, "2099-04-04"); assert.equal(dateDeadline.due.at, null);
+    const timedDeadline = await client.updateTask(task.id, { dueAt: "2099-04-04T17:00:00.000Z" });
+    assert.equal(timedDeadline.due.date, null); assert.equal(timedDeadline.due.at, "2099-04-04T17:00:00.000Z");
+  } finally { await cleanup(); }
+});
+
+test("late recurring completion creates the next anchored occurrence", async () => {
+  const repository = createMemoryRepository(TEST_USER.id); setRepository(repository);
+  try {
+    const original = await repository.tasks.create(TEST_USER.id, { title: "Weekly", dueDate: "2026-08-19", recurrenceRule: "FREQ=WEEKLY", reminders: [{ remindAt: "2026-08-19T08:00:00.000Z" }] });
+    const result = await taskService.completeTask(TEST_USER.id, original.id, "UTC", new Date("2026-08-20T12:00:00.000Z"));
+    assert.equal(result.task.status, "completed"); assert.ok(result.spawnedTask); assert.equal(result.spawnedTask?.due.date, "2026-08-26");
+    assert.equal(result.spawnedTask?.reminders[0]?.remindAt, "2026-08-26T08:00:00.000Z");
+  } finally { clearRepository(); }
 });
 
 test("focus, activity, task history and project-name search work", async () => {

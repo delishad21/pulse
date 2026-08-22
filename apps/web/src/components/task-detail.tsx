@@ -137,7 +137,8 @@ function TaskDetailForm({ task }: { task: Task }) {
 
                 <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
                   {task.priority !== "none" ? <span className="rounded-full bg-primary-soft px-2.5 py-1 capitalize text-primary">{task.priority} priority</span> : null}
-                  {task.tags.map((tag) => <span key={tag.id} className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2.5 py-1 text-muted"><Tag className="size-3" />{tag.name}</span>)}
+                  {task.tags.map((tag) => <span key={tag.id} className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2.5 py-1 text-muted"><Tag className="size-3" />@{tag.name}</span>)}
+                  {task.startAt ? <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2.5 py-1 text-muted"><Clock3 className="size-3" />{new Date(task.startAt).toLocaleString()}{task.endAt ? ` – ${new Date(task.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</span> : null}
                   {task.due.date ? <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2.5 py-1 text-muted"><CalendarDays className="size-3" />Due {task.due.date}</span> : null}
                   {task.due.at ? <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2.5 py-1 text-muted"><Clock3 className="size-3" />{new Date(task.due.at).toLocaleString()}</span> : null}
                   {task.recurrenceRule ? <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2.5 py-1 text-muted"><Repeat2 className="size-3" />Recurring</span> : null}
@@ -159,7 +160,7 @@ function TaskDetailForm({ task }: { task: Task }) {
             <ul className="space-y-2">
               {reminders.map((reminder) => (
                 <li key={reminder.id} className="flex items-center justify-between gap-3 rounded-lg bg-surface-subtle px-3 py-2.5 text-sm text-ink">
-                  <span className="min-w-0 truncate">{new Date(reminder.remindAt).toLocaleString()} <span className="text-xs text-muted-soft">({reminder.status})</span></span>
+                  <span className="min-w-0 truncate">{new Date(reminder.remindAt).toLocaleString()} <span className="text-xs text-muted-soft">({reminder.channel.replaceAll("_", " ")} · {reminder.status})</span></span>
                   <button type="button" onClick={() => deleteReminder.mutate(reminder.id)} className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted hover:bg-red-50 hover:text-danger dark:hover:bg-red-950/30" aria-label="Remove reminder"><Trash2 className="size-3.5" /></button>
                 </li>
               ))}

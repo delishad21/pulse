@@ -7,9 +7,9 @@ function task(overrides: Partial<Task> = {}): Task {
   return {
     id: overrides.id ?? crypto.randomUUID(), userId: "u", title: "Task",
     description: null, status: "open", priority: "none",
-    due: { date: null, at: null }, reminderAt: null, recurrenceRule: null,
-    completedAt: null, deletedAt: null, projectId: null, sectionId: null,
-    parentTaskId: null, sortOrder: 0, revision: 0, tags: [],
+    startAt: null, endAt: null, due: { date: null, at: null }, recurrenceRule: null,
+    completedAt: null, deletedAt: null, projectId: null,
+    parentTaskId: null, sortOrder: 0, revision: 0, tags: [], reminders: [],
     createdAt: new Date(0).toISOString(), updatedAt: new Date(0).toISOString(),
     ...overrides,
   };

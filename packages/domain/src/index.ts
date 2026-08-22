@@ -1,7 +1,6 @@
 export type TaskId = string;
 export type UserId = string;
 export type ProjectId = string;
-export type SectionId = string | null;
 export type TagId = string;
 export type CommentId = string;
 export type OperationId = string;
@@ -18,14 +17,16 @@ export interface TaskDue {
 }
 
 export interface TaskScheduleInput {
+  startAt?: string | null;
+  endAt?: string | null;
   dueDate?: string | null;
   dueAt?: string | null;
-  reminderAt?: string | null;
 }
 
 export interface TaskSchedule {
+  startAt: string | null;
+  endAt: string | null;
   due: TaskDue;
-  reminderAt: string | null;
 }
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
@@ -35,26 +36,23 @@ function requireValidInstant(value: string, field: string): string {
   return value;
 }
 
+export function requireValidDateOnly(value: string, field = "date"): string {
+  if (!DATE_ONLY.test(value)) throw new Error(`${field} must use YYYY-MM-DD and must not include a time`);
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) throw new Error(`${field} must be a real calendar date`);
+  return value;
+}
+
 export function normalizeTaskSchedule(input: TaskScheduleInput): TaskSchedule {
+  const startAt = input.startAt == null ? null : requireValidInstant(input.startAt, "startAt");
+  const endAt = input.endAt == null ? null : requireValidInstant(input.endAt, "endAt");
   const dueDate = input.dueDate ?? null;
-  const dueAt = input.dueAt ?? null;
-  const reminderAt = input.reminderAt == null ? null : requireValidInstant(input.reminderAt, "reminderAt");
-  if (dueDate !== null && !DATE_ONLY.test(dueDate)) {
-    throw new Error("dueDate must use YYYY-MM-DD and must not include a time");
-  }
-  if (dueDate !== null) {
-    const parsedDate = new Date(`${dueDate}T00:00:00Z`);
-    if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== dueDate) {
-      throw new Error("dueDate must be a real calendar date");
-    }
-  }
-  return {
-    due: {
-      date: dueDate,
-      at: dueAt === null || dueDate !== null ? null : requireValidInstant(dueAt, "dueAt"),
-    },
-    reminderAt,
-  };
+  const dueAt = input.dueAt == null ? null : requireValidInstant(input.dueAt, "dueAt");
+  if (dueDate !== null) requireValidDateOnly(dueDate, "dueDate");
+  if (dueDate !== null && dueAt !== null) throw new Error("Use either dueDate or dueAt, not both");
+  if (endAt !== null && startAt === null) throw new Error("endAt requires startAt");
+  if (startAt !== null && endAt !== null && new Date(endAt) < new Date(startAt)) throw new Error("endAt must not be before startAt");
+  return { startAt, endAt, due: { date: dueDate, at: dueAt } };
 }
 
 export interface Tag {
@@ -67,6 +65,18 @@ export interface Tag {
   deletedAt: string | null;
 }
 
+export interface Reminder {
+  id: ReminderId;
+  taskId: TaskId;
+  userId: UserId;
+  remindAt: string;
+  channel: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
 export interface Task {
   id: TaskId;
   userId: UserId;
@@ -74,17 +84,18 @@ export interface Task {
   description: string | null;
   status: TaskStatus;
   priority: Priority;
+  startAt: string | null;
+  endAt: string | null;
   due: TaskDue;
-  reminderAt: string | null;
   recurrenceRule: string | null;
   completedAt: string | null;
   deletedAt: string | null;
   projectId: ProjectId | null;
-  sectionId: SectionId;
   parentTaskId: TaskId | null;
   sortOrder: number;
   revision: number;
   tags: Tag[];
+  reminders: Reminder[];
   createdAt: string;
   updatedAt: string;
 }
@@ -104,33 +115,11 @@ export interface Project {
   deletedAt: string | null;
 }
 
-export interface Section {
-  id: string;
-  projectId: ProjectId;
-  name: string;
-  sortOrder: number;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt: string | null;
-}
-
 export interface Comment {
   id: CommentId;
   taskId: TaskId;
   userId: UserId;
   body: string;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt: string | null;
-}
-
-export interface Reminder {
-  id: ReminderId;
-  taskId: TaskId;
-  userId: UserId;
-  remindAt: string;
-  channel: string;
-  status: string;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -154,9 +143,8 @@ export interface Operation {
   createdAt: string;
 }
 
-export const priorityWeight: Record<Priority, number> = {
-  none: 0, low: 1, medium: 2, high: 3, urgent: 4,
-};
+export const priorityWeight: Record<Priority, number> = { none: 0, low: 1, medium: 2, high: 3, urgent: 4 };
+export const priorityLabel: Record<Priority, string> = { none: "None", low: "Low", medium: "Medium", high: "High", urgent: "Urgent" };
 
 export function compareTasksByPriority(a: Task, b: Task): number {
   return priorityWeight[b.priority] - priorityWeight[a.priority];
@@ -165,9 +153,7 @@ export function compareTasksByPriority(a: Task, b: Task): number {
 export type TaskView = "inbox" | "today" | "upcoming" | "overdue" | "completed" | "focus";
 
 export function formatDateInTimezone(date: Date, timezone: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(date);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
 
 function zonedMidnightUtc(dateOnly: string, timezone: string): Date {
@@ -181,8 +167,7 @@ function zonedMidnightUtc(dateOnly: string, timezone: string): Date {
   for (let i = 0; i < 4; i += 1) {
     const parts = Object.fromEntries(formatter.formatToParts(new Date(guess)).map((p) => [p.type, p.value]));
     const represented = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), Number(parts.second));
-    const offset = represented - guess;
-    const next = desired - offset;
+    const next = desired - (represented - guess);
     if (Math.abs(next - guess) < 1000) return new Date(next);
     guess = next;
   }
@@ -198,7 +183,14 @@ export function dayBoundsInTimezone(now: Date, timezone = "UTC"): { date: string
   return { date, start, end: new Date(nextStart.getTime() - 1), nextDate };
 }
 
-function taskDueInstant(task: Task): Date | null {
+export function taskViewDate(task: Task, timezone = "UTC"): string | null {
+  if (task.startAt) return formatDateInTimezone(new Date(task.startAt), timezone);
+  if (task.due.at) return formatDateInTimezone(new Date(task.due.at), timezone);
+  return task.due.date;
+}
+
+function taskSortInstant(task: Task): Date | null {
+  if (task.startAt) return new Date(task.startAt);
   if (task.due.at) return new Date(task.due.at);
   if (task.due.date) return new Date(`${task.due.date}T00:00:00Z`);
   return null;
@@ -210,20 +202,13 @@ export function isTaskInInbox(task: Task): boolean {
 
 export function isTaskDueToday(task: Task, now: Date, timezone = "UTC"): boolean {
   if (task.status !== "open" || task.deletedAt !== null) return false;
-  const bounds = dayBoundsInTimezone(now, timezone);
-  if (task.due.date) return task.due.date === bounds.date;
-  if (task.due.at) { const due = new Date(task.due.at); return due >= bounds.start && due <= bounds.end; }
-  if (task.reminderAt) { const reminder = new Date(task.reminderAt); return reminder >= bounds.start && reminder <= bounds.end; }
-  return false;
+  return taskViewDate(task, timezone) === dayBoundsInTimezone(now, timezone).date;
 }
 
 export function isTaskUpcoming(task: Task, now: Date, timezone = "UTC"): boolean {
   if (task.status !== "open" || task.deletedAt !== null) return false;
-  const bounds = dayBoundsInTimezone(now, timezone);
-  if (task.due.date) return task.due.date > bounds.date;
-  if (task.due.at) return new Date(task.due.at) > bounds.end;
-  if (task.reminderAt) return new Date(task.reminderAt) > bounds.end;
-  return false;
+  const date = taskViewDate(task, timezone);
+  return date !== null && date > dayBoundsInTimezone(now, timezone).date;
 }
 
 export function isTaskOverdue(task: Task, now: Date, timezone = "UTC"): boolean {
@@ -244,16 +229,13 @@ export function isTaskFocus(task: Task, now: Date, timezone = "UTC"): boolean {
 }
 
 export function sortTasksForView(tasks: Task[], _view: Exclude<TaskView, "completed">, _now?: Date): Task[] {
-  const sorted = [...tasks];
-  sorted.sort((a, b) => {
-    const dueA = taskDueInstant(a); const dueB = taskDueInstant(b);
-    if (dueA && dueB && dueA.getTime() !== dueB.getTime()) return dueA.getTime() - dueB.getTime();
-    if (dueA && !dueB) return -1; if (!dueA && dueB) return 1;
+  return [...tasks].sort((a, b) => {
+    const timeA = taskSortInstant(a); const timeB = taskSortInstant(b);
+    if (timeA && timeB && timeA.getTime() !== timeB.getTime()) return timeA.getTime() - timeB.getTime();
+    if (timeA && !timeB) return -1; if (!timeA && timeB) return 1;
     const priorityDiff = compareTasksByPriority(a, b);
-    if (priorityDiff !== 0) return priorityDiff;
-    return a.sortOrder - b.sortOrder || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    return priorityDiff || a.sortOrder - b.sortOrder || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
-  return sorted;
 }
 
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
@@ -268,6 +250,7 @@ export interface RecurrenceSpec {
 
 const FREQ_TO_RRULE: Record<RecurrenceFrequency, string> = { daily: "DAILY", weekly: "WEEKLY", monthly: "MONTHLY", yearly: "YEARLY" };
 const RRULE_TO_FREQ: Record<string, RecurrenceFrequency> = { DAILY: "daily", WEEKLY: "weekly", MONTHLY: "monthly", YEARLY: "yearly" };
+const WEEKDAY_CODES: Weekday[] = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
 
 export function generateRecurrenceRule(spec: RecurrenceSpec): string {
   const interval = spec.interval ?? 1;
@@ -299,4 +282,77 @@ export function parseRecurrenceRule(rule: string): RecurrenceSpec {
   }
   generateRecurrenceRule(spec);
   return spec;
+}
+
+function dateOnlyToUtc(value: string): Date {
+  requireValidDateOnly(value);
+  return new Date(`${value}T00:00:00Z`);
+}
+function utcDateOnly(value: Date): string { return value.toISOString().slice(0, 10); }
+function addDays(value: string, days: number): string { const d=dateOnlyToUtc(value); d.setUTCDate(d.getUTCDate()+days); return utcDateOnly(d); }
+function dayOrdinal(value: string): number { return Math.floor(dateOnlyToUtc(value).getTime() / 86_400_000); }
+function monthsBetween(anchor: string, candidate: string): number { const a=dateOnlyToUtc(anchor), c=dateOnlyToUtc(candidate); return (c.getUTCFullYear()-a.getUTCFullYear())*12 + c.getUTCMonth()-a.getUTCMonth(); }
+function weekday(value: string): Weekday { return WEEKDAY_CODES[dateOnlyToUtc(value).getUTCDay()]!; }
+function mondayOrdinal(value: string): number { const d=dateOnlyToUtc(value); const offset=(d.getUTCDay()+6)%7; return dayOrdinal(value)-offset; }
+function clampedDay(year:number, month:number, day:number): number { return Math.min(day, new Date(Date.UTC(year, month+1, 0)).getUTCDate()); }
+
+function matchesRecurrenceDate(anchor: string, candidate: string, spec: RecurrenceSpec): boolean {
+  const interval = spec.interval ?? 1;
+  if (candidate <= anchor) return false;
+  const diffDays = dayOrdinal(candidate) - dayOrdinal(anchor);
+  if (spec.frequency === "daily") return diffDays > 0 && diffDays % interval === 0;
+  if (spec.frequency === "weekly") {
+    const diffWeeks = Math.floor((mondayOrdinal(candidate) - mondayOrdinal(anchor)) / 7);
+    const allowed = spec.byWeekday?.length ? spec.byWeekday : [weekday(anchor)];
+    return diffWeeks >= 0 && diffWeeks % interval === 0 && allowed.includes(weekday(candidate));
+  }
+  const a = dateOnlyToUtc(anchor), c = dateOnlyToUtc(candidate);
+  if (spec.frequency === "monthly") {
+    const diffMonths = monthsBetween(anchor, candidate);
+    return diffMonths > 0 && diffMonths % interval === 0 && c.getUTCDate() === clampedDay(c.getUTCFullYear(), c.getUTCMonth(), a.getUTCDate());
+  }
+  const diffYears = c.getUTCFullYear() - a.getUTCFullYear();
+  return diffYears > 0 && diffYears % interval === 0 && c.getUTCMonth() === a.getUTCMonth() && c.getUTCDate() === clampedDay(c.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate());
+}
+
+function recurrenceWithinUntil(candidate: Date, spec: RecurrenceSpec): boolean {
+  return !spec.until || candidate.getTime() <= new Date(spec.until).getTime();
+}
+
+export function nextRecurrenceDate(anchorDate: string, rule: string, afterDate: string): string | null {
+  requireValidDateOnly(anchorDate, "anchorDate"); requireValidDateOnly(afterDate, "afterDate");
+  const spec = parseRecurrenceRule(rule);
+  if (spec.count === 1) return null;
+  let candidate = addDays(afterDate > anchorDate ? afterDate : anchorDate, 1);
+  for (let i=0; i<36_600; i+=1, candidate=addDays(candidate,1)) {
+    if (!matchesRecurrenceDate(anchorDate, candidate, spec)) continue;
+    if (!recurrenceWithinUntil(new Date(`${candidate}T23:59:59.999Z`), spec)) return null;
+    return candidate;
+  }
+  throw new Error("Unable to find next recurrence within 100 years");
+}
+
+export function nextRecurrenceInstant(anchorIso: string, rule: string, after: Date): string | null {
+  const anchor = new Date(requireValidInstant(anchorIso, "anchorIso"));
+  const spec = parseRecurrenceRule(rule);
+  if (spec.count === 1) return null;
+  const anchorDate = utcDateOnly(anchor);
+  const afterDate = utcDateOnly(after);
+  const timeMs = anchor.getUTCHours()*3_600_000 + anchor.getUTCMinutes()*60_000 + anchor.getUTCSeconds()*1000 + anchor.getUTCMilliseconds();
+  let candidateDate = afterDate > anchorDate ? afterDate : anchorDate;
+  for (let i=0; i<36_600; i+=1, candidateDate=addDays(candidateDate,1)) {
+    if (!matchesRecurrenceDate(anchorDate, candidateDate, spec)) continue;
+    const candidate = new Date(dateOnlyToUtc(candidateDate).getTime()+timeMs);
+    if (candidate <= after) continue;
+    if (!recurrenceWithinUntil(candidate, spec)) return null;
+    return candidate.toISOString();
+  }
+  throw new Error("Unable to find next recurrence within 100 years");
+}
+
+export function recurrenceRuleForNextOccurrence(rule: string): string | null {
+  const spec = parseRecurrenceRule(rule);
+  if (spec.count == null) return rule;
+  if (spec.count <= 1) return null;
+  return generateRecurrenceRule({ ...spec, count: spec.count - 1 });
 }

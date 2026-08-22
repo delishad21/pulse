@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Task } from "@pulse/api-client";
-import { useCompleteTask, useTasks } from "@/hooks/use-tasks";
+import { useCompleteTask, useReopenTask, useTasks } from "@/hooks/use-tasks";
 import { localDateKey, monthGrid, taskDateKey, weekDays } from "@/lib/task-dates";
 import { cn } from "@/lib/utils";
 import { Shell } from "./shell";
@@ -18,19 +18,24 @@ function tasksForDate(tasks: Task[], date: Date): Task[] {
 
 function WeekTask({ task, onOpen }: { task: Task; onOpen: () => void }) {
   const complete = useCompleteTask();
+  const reopen = useReopenTask();
   return (
     <div className="flex items-start gap-2">
-      <input type="checkbox" checked={false} onChange={() => complete.mutate(task.id)} aria-label={`Complete ${task.title}`} className="mt-3 size-4 shrink-0 cursor-pointer rounded border-stroke accent-primary" />
+      <input type="checkbox" checked={task.status === "completed"} onChange={(event) => event.target.checked ? complete.mutate(task.id) : reopen.mutate(task.id)} aria-label={`Complete ${task.title}`} className="mt-3 size-4 shrink-0 cursor-pointer rounded border-stroke accent-primary" />
       <button type="button" onClick={onOpen} data-testid="week-task" className="min-w-0 flex-1 rounded-xl border border-stroke bg-surface px-3 py-2.5 text-left shadow-card transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
         <span className="line-clamp-2 block text-sm font-semibold leading-5 text-ink">{task.title}</span>
-        {task.due.at ? <span className="mt-1 block text-[11px] font-medium text-muted">{new Date(task.due.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span> : null}
+        {task.startAt ? <span className="mt-1 block text-[11px] font-medium text-muted">{new Date(task.startAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{task.endAt ? `–${new Date(task.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</span> : task.due.at ? <span className="mt-1 block text-[11px] font-medium text-muted">Due {new Date(task.due.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span> : null}
       </button>
     </div>
   );
 }
 
 export function UpcomingCalendar() {
-  const { data: tasks = [], isLoading } = useTasks({ status: "open" });
+  const openTasks = useTasks({ status: "open" });
+  const [showCompleted, setShowCompleted] = useState(false);
+  const completedTasks = useTasks({ status: "completed" }, showCompleted);
+  const tasks = [...(openTasks.data ?? []), ...(showCompleted ? (completedTasks.data ?? []) : [])];
+  const isLoading = openTasks.isLoading || (showCompleted && completedTasks.isLoading);
   const [view, setView] = useState<UpcomingView>("week");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
@@ -49,10 +54,10 @@ export function UpcomingCalendar() {
             <h1 className="text-[30px] font-bold leading-tight tracking-[-0.03em] text-ink">Upcoming</h1>
             <p className="mt-1 text-sm font-medium text-muted">Plan your week or scan the month at a glance.</p>
           </div>
-          <div className="flex items-center rounded-lg border border-stroke bg-surface p-1 shadow-sm" aria-label="Upcoming view">
+          <div className="flex items-center gap-2"><button type="button" onClick={() => setShowCompleted((value) => !value)} aria-pressed={showCompleted} className="h-10 rounded-lg border border-stroke bg-surface px-3 text-xs font-semibold text-muted shadow-sm hover:bg-surface-subtle">{showCompleted ? "Hide completed" : "Show completed"}</button><div className="flex items-center rounded-lg border border-stroke bg-surface p-1 shadow-sm" aria-label="Upcoming view">
             <button type="button" onClick={() => setView("week")} className={cn("h-9 rounded-md px-4 text-sm font-semibold transition", view === "week" ? "bg-primary text-white shadow-sm" : "text-muted hover:bg-surface-subtle hover:text-ink")}>Week</button>
             <button type="button" onClick={() => setView("month")} className={cn("h-9 rounded-md px-4 text-sm font-semibold transition", view === "month" ? "bg-primary text-white shadow-sm" : "text-muted hover:bg-surface-subtle hover:text-ink")}>Month</button>
-          </div>
+          </div></div>
         </div>
 
         {isLoading ? <div className="h-80 animate-pulse rounded-xl bg-surface" /> : view === "week" ? (
@@ -102,7 +107,7 @@ export function UpcomingCalendar() {
                         <div className={cn("mb-1 flex size-5 items-center justify-center rounded-full text-[10px] font-bold sm:size-6 md:mb-2 md:size-7 md:text-xs", key === todayKey ? "bg-primary text-white" : inMonth ? "text-ink" : "text-muted-soft")}>{day.getDate()}</div>
                         <div className="space-y-1.5">
                           {dayTasks.map((task) => (
-                            <button key={task.id} type="button" onClick={() => setSelectedTask(task)} title={task.title} data-testid="month-task" className="block w-full truncate rounded border border-stroke bg-surface px-1 py-1 text-left text-[9px] font-semibold text-ink shadow-sm transition hover:border-primary/35 hover:bg-primary-soft/40 sm:text-[10px] md:rounded-md md:px-2 md:py-1.5 md:text-xs">{task.title}</button>
+                            <button key={task.id} type="button" onClick={() => setSelectedTask(task)} title={task.title} data-testid="month-task" className={cn("block w-full truncate rounded border border-stroke bg-surface px-1 py-1 text-left text-[9px] font-semibold text-ink shadow-sm transition hover:border-primary/35 hover:bg-primary-soft/40 sm:text-[10px] md:rounded-md md:px-2 md:py-1.5 md:text-xs", task.status === "completed" && "line-through opacity-55")}>{task.title}</button>
                           ))}
                         </div>
                       </div>
