@@ -8,7 +8,6 @@ import {
   CalendarRange,
   CircleCheckBig,
   Inbox,
-  LayoutDashboard,
   Menu,
   LogOut,
   Plus,
@@ -24,7 +23,6 @@ import { TaskCreateModal } from "./task-create-modal";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
 const taskNav: NavItem[] = [
-  { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/today", label: "Today", icon: CalendarDays },
   { href: "/upcoming", label: "Upcoming", icon: CalendarRange },
@@ -36,7 +34,7 @@ const toolNav: NavItem[] = [
 ];
 
 function isRouteActive(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  return pathname.startsWith(href);
 }
 
 function NavLink({ item, pathname, onNavigate }: { item: NavItem; pathname: string; onNavigate?: () => void }) {

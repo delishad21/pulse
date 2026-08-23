@@ -9,26 +9,29 @@ import { Plus, Trash2 } from "lucide-react";
 
 interface Props { task: Task; onCancel: () => void; onSaved: () => void; }
 const localDateTime = (value: string | null) => { if (!value) return ""; const date = new Date(value); const offset = date.getTimezoneOffset() * 60_000; return new Date(date.getTime() - offset).toISOString().slice(0, 16); };
+
 export function TaskEditor({ task, onCancel, onSaved }: Props) {
   const updateTask = useUpdateTask(); const { data: projects } = useProjects(); const { data: tags } = useTags();
-  const [title, setTitle] = useState(task.title); const [description, setDescription] = useState(task.description ?? "");
+  const [title, setTitle] = useState(task.title); const [description, setDescription] = useState(task.description ?? ""); const [location, setLocation] = useState(task.location ?? "");
   const [startAt, setStartAt] = useState(localDateTime(task.startAt)); const [endAt, setEndAt] = useState(localDateTime(task.endAt));
   const [dueDate, setDueDate] = useState(task.due.date ?? ""); const [dueAt, setDueAt] = useState(localDateTime(task.due.at));
   const [priority, setPriority] = useState<Priority>(task.priority); const [projectId, setProjectId] = useState(task.projectId ?? "");
   const [tagIds, setTagIds] = useState(task.tags.map((tag) => tag.id)); const [recurrenceRule, setRecurrenceRule] = useState(task.recurrenceRule ?? "");
   const [reminders, setReminders] = useState(task.reminders.map((reminder) => localDateTime(reminder.remindAt)));
+
   const submit = (event: React.FormEvent) => {
     event.preventDefault(); if (!title.trim()) return;
     updateTask.mutate({ id: task.id, input: {
-      title: title.trim(), description: description.trim() || null, priority, projectId: projectId || null, tagIds,
+      title: title.trim(), description: description.trim() || null, location: location.trim() || null, priority, projectId: projectId || null, tagIds,
       startAt: startAt ? new Date(startAt).toISOString() : null, endAt: endAt ? new Date(endAt).toISOString() : null,
-      dueDate: dueAt ? null : (dueDate || null), dueAt: dueAt ? new Date(dueAt).toISOString() : null,
-      recurrenceRule: recurrenceRule.trim() || null,
+      dueDate: dueAt ? null : (dueDate || null), dueAt: dueAt ? new Date(dueAt).toISOString() : null, recurrenceRule: recurrenceRule.trim() || null,
       reminders: reminders.filter(Boolean).map((value) => ({ remindAt: new Date(value).toISOString(), channel: "hermes_telegram" })),
     } }, { onSuccess: onSaved });
   };
-  return <form onSubmit={submit} className="space-y-4">    <div><label htmlFor={`title-${task.id}`} className="text-xs font-semibold text-muted">Title</label><input id={`title-${task.id}`} value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm outline-none focus:border-primary" /></div>
+  return <form onSubmit={submit} className="space-y-4">
+    <div><label htmlFor={`title-${task.id}`} className="text-xs font-semibold text-muted">Title</label><input id={`title-${task.id}`} value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm outline-none focus:border-primary" /></div>
     <div><label htmlFor={`description-${task.id}`} className="text-xs font-semibold text-muted">Description</label><textarea id={`description-${task.id}`} value={description} onChange={(event) => setDescription(event.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm outline-none focus:border-primary" /></div>
+    <div><label htmlFor={`location-${task.id}`} className="text-xs font-semibold text-muted">Location (*)</label><input id={`location-${task.id}`} value={location} onChange={(event) => setLocation(event.target.value)} className="mt-1 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm outline-none focus:border-primary" /></div>
     <div className="grid gap-3 sm:grid-cols-2">
       <div><label htmlFor={`start-${task.id}`} className="text-xs font-semibold text-muted">Start</label><input id={`start-${task.id}`} type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} className="mt-1 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm" /></div>
       <div><label htmlFor={`end-${task.id}`} className="text-xs font-semibold text-muted">End</label><input id={`end-${task.id}`} type="datetime-local" min={startAt || undefined} value={endAt} onChange={(event) => setEndAt(event.target.value)} className="mt-1 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm" /></div>
@@ -40,7 +43,7 @@ export function TaskEditor({ task, onCancel, onSaved }: Props) {
       <div><label htmlFor={`project-${task.id}`} className="text-xs font-semibold text-muted">Project (#)</label><select id={`project-${task.id}`} value={projectId} onChange={(event) => setProjectId(event.target.value)} className="mt-1 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm"><option value="">Inbox</option>{projects?.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></div>
     </div>
     <div className="grid gap-3 sm:grid-cols-2">
-      <div><label htmlFor={`recurrence-${task.id}`} className="text-xs font-semibold text-muted">Recurrence</label><input id={`recurrence-${task.id}`} value={recurrenceRule} onChange={(event) => setRecurrenceRule(event.target.value)} placeholder="FREQ=WEEKLY;INTERVAL=2" className="mt-1 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm" /><p className="mt-1 text-[11px] text-muted-soft">Examples: FREQ=DAILY;INTERVAL=10, FREQ=WEEKLY, FREQ=MONTHLY.</p></div>
+      <div><label htmlFor={`recurrence-${task.id}`} className="text-xs font-semibold text-muted">Recurrence</label><input id={`recurrence-${task.id}`} value={recurrenceRule} onChange={(event) => setRecurrenceRule(event.target.value)} placeholder="FREQ=WEEKLY;INTERVAL=2" className="mt-1 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm" /></div>
       <div><label htmlFor={`labels-${task.id}`} className="text-xs font-semibold text-muted">Labels (@)</label><select id={`labels-${task.id}`} multiple value={tagIds} onChange={(event) => setTagIds([...event.target.selectedOptions].map((option) => option.value))} className="mt-1 h-24 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm">{tags?.map((tag) => <option key={tag.id} value={tag.id}>@{tag.name}</option>)}</select></div>
     </div>
     <div>

@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarDays, CheckCircle2, Clock3, GripVertical, Pencil, Tag, Trash2 } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, GripVertical, MapPin, Pencil, Tag, Trash2 } from "lucide-react";
 import { formatDate, isOverdue, isToday, cn } from "@/lib/utils";
 import { useDeleteTask, useCompleteTask, useReopenTask, useReorderTasks } from "@/hooks/use-tasks";
 import type { Task } from "@pulse/api-client";
@@ -119,7 +119,8 @@ function SortableTaskRow({ task, selected, onSelect, reorderable }: {
               {task.priority !== "none" ? (
                 <span className="inline-flex items-center gap-1.5 capitalize"><span className={cn("size-1.5 rounded-full", priorityClass(task.priority))} />{task.priority}</span>
               ) : null}
-              {task.tags.map((tag) => <span key={tag.id} className="inline-flex items-center gap-1"><Tag className="size-3" />@{tag.name}</span>)}
+              {task.tags.map((tag) => <span key={tag.id} className="inline-flex items-center gap-1 font-semibold" style={{ color: tag.color ?? undefined }}><Tag className="size-3" />@{tag.name}</span>)}
+              {task.location ? <span className="inline-flex items-center gap-1 text-muted"><MapPin className="size-3.5" />{task.location}</span> : null}
               {task.startAt ? (
                 <span className="inline-flex items-center gap-1 text-muted"><Clock3 className="size-3.5" />{new Date(task.startAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}{task.endAt ? `–${new Date(task.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
               ) : null}

@@ -8,7 +8,7 @@ import {
 } from "./index.ts";
 
 const baseTask: Task = {
-  id:"t1",userId:"u1",title:"Task",description:null,status:"open",priority:"none",
+  id:"t1",userId:"u1",title:"Task",description:null,location:null,status:"open",priority:"none",
   startAt:null,endAt:null,due:{date:null,at:null},recurrenceRule:null,completedAt:null,
   deletedAt:null,projectId:null,parentTaskId:null,sortOrder:0,revision:0,tags:[],reminders:[],
   createdAt:"2026-08-20T00:00:00Z",updatedAt:"2026-08-20T00:00:00Z",

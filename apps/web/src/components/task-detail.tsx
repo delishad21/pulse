@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   CalendarDays,
   Clock3,
+  MapPin,
   MessageSquareText,
   Pencil,
   Plus,
@@ -138,7 +139,7 @@ function TaskDetailForm({ task }: { task: Task }) {
                 <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
                   {task.priority !== "none" ? <span className="rounded-full bg-primary-soft px-2.5 py-1 capitalize text-primary">{task.priority} priority</span> : null}
                   {task.tags.map((tag) => <span key={tag.id} className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2.5 py-1 text-muted"><Tag className="size-3" />@{tag.name}</span>)}
-                  {task.startAt ? <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2.5 py-1 text-muted"><Clock3 className="size-3" />{new Date(task.startAt).toLocaleString()}{task.endAt ? ` – ${new Date(task.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</span> : null}
+                  {task.location ? <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2.5 py-1 text-muted"><MapPin className="size-3" />{task.location}</span> : null}                  {task.startAt ? <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2.5 py-1 text-muted"><Clock3 className="size-3" />{new Date(task.startAt).toLocaleString()}{task.endAt ? ` – ${new Date(task.endAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}</span> : null}
                   {task.due.date ? <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2.5 py-1 text-muted"><CalendarDays className="size-3" />Due {task.due.date}</span> : null}
                   {task.due.at ? <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2.5 py-1 text-muted"><Clock3 className="size-3" />{new Date(task.due.at).toLocaleString()}</span> : null}
                   {task.recurrenceRule ? <span className="inline-flex items-center gap-1 rounded-full bg-surface-subtle px-2.5 py-1 text-muted"><Repeat2 className="size-3" />Recurring</span> : null}
@@ -201,7 +202,7 @@ export function TaskDetail({ id }: TaskDetailProps) {
   return (
     <Shell>
       <div className="mx-auto w-full max-w-[880px] px-4 py-8 md:px-8 md:py-10">
-        <Link href="/" className="mb-5 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-semibold text-muted transition hover:bg-surface hover:text-ink"><ArrowLeft className="size-4" /> Back to tasks</Link>
+        <Link href="/inbox" className="mb-5 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-semibold text-muted transition hover:bg-surface hover:text-ink"><ArrowLeft className="size-4" /> Back to tasks</Link>
         <TaskDetailForm task={task} />
       </div>
     </Shell>

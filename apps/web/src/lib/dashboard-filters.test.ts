@@ -6,7 +6,7 @@ import { filterTasks } from "./dashboard-filters.ts";
 function task(overrides: Partial<Task> = {}): Task {
   return {
     id: overrides.id ?? crypto.randomUUID(), userId: "u", title: "Task",
-    description: null, status: "open", priority: "none",
+    description: null, location: null, status: "open", priority: "none",
     startAt: null, endAt: null, due: { date: null, at: null }, recurrenceRule: null,
     completedAt: null, deletedAt: null, projectId: null,
     parentTaskId: null, sortOrder: 0, revision: 0, tags: [], reminders: [],

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, Check, FolderInput, RotateCcw, RotateCw, Trash2, X } from "lucide-react";
+import { CalendarClock, Check, CheckCircle2, FolderInput, Plus, RotateCcw, RotateCw, Trash2, X } from "lucide-react";
 import { useTasks, useTaskView, useBulkTasks, useBulkMoveTasks, useBulkRescheduleTasks } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { useUndo, useRedo, useHistory } from "@/hooks/use-history";
 import { TaskList } from "./task-list";
+import { TaskComposer } from "./task-composer";
 import { Shell } from "./shell";
 import { filterTasks, type DashboardFilter } from "@/lib/dashboard-filters";
 import { groupTasksByDate } from "@/lib/task-dates";
@@ -33,6 +34,17 @@ function getTasksQuery(filter: DashboardFilter) {
   return undefined;
 }
 
+function EmptyTasks({ message, compact = false }: { message: string; compact?: boolean }) {
+  return <div className={`flex flex-col items-center justify-center text-center ${compact ? "min-h-[260px]" : "min-h-[52vh]"}`}>
+    <div className="relative mb-5 flex size-24 items-center justify-center rounded-full bg-primary-soft/60">
+      <div className="absolute size-16 rounded-full border border-primary/15" />
+      <CheckCircle2 className="size-10 text-primary/75" />
+    </div>
+    <p className="text-base font-semibold text-ink">All clear</p>
+    <p className="mt-1 text-sm text-muted">{message}</p>
+  </div>;
+}
+
 export function Dashboard({ title, filter, header }: DashboardProps) {
   const canonicalView = filter.type === "inbox" || filter.type === "today" ? filter.type : null;
   const [showCompleted, setShowCompleted] = useState(false);
@@ -51,6 +63,7 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [moveProjectId, setMoveProjectId] = useState("");
   const [bulkDueDate, setBulkDueDate] = useState("");
+  const [composerKey, setComposerKey] = useState<string | null>(null);
 
   const filtered = tasks
     ? (filter.type === "inbox" || filter.type === "today")
@@ -171,35 +184,31 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
           </div>
         )}
 
-        {filter.type === "all" || filter.type === "inbox" ? (
+        {filter.type === "inbox" ? (
           isLoading ? (
-            <div className="space-y-6">{[0, 1].map((item) => <div key={item}><div className="mb-2 h-4 w-28 animate-pulse rounded bg-surface-subtle" /><div className="h-40 animate-pulse rounded-xl border border-stroke bg-surface" /></div>)}</div>
+            <div className="space-y-7">{[0, 1].map((item) => <div key={item}><div className="mb-2 h-4 w-28 animate-pulse rounded bg-surface-subtle" /><div className="h-28 animate-pulse border-t border-stroke bg-surface/20" /></div>)}</div>
           ) : filtered.length ? (
-            <div className="space-y-6">
-              {groupTasksByDate(filtered).map((group) => (
-                <div key={group.key ?? "no-date"} data-date-group={group.key ?? "no-date"}>
-                  <div className="mb-2 flex items-baseline gap-2 px-1">
-                    <h2 className="text-sm font-bold text-ink">{group.label}</h2>
-                    <span className="text-xs font-medium text-muted-soft">{group.tasks.length}</span>
-                  </div>
-                  <section className="overflow-hidden rounded-xl border border-stroke bg-surface shadow-card">
-                    <TaskList tasks={group.tasks} selectedIds={selectedIds} onSelect={toggleSelect} />
-                  </section>
-                </div>
-              ))}
+            <div className="space-y-8">
+              {groupTasksByDate(filtered).map((group) => {
+                const key = group.key ?? "no-date";
+                return <div key={key} data-date-group={key}>
+                  <div className="mb-1 flex items-baseline gap-2"><h2 className="text-sm font-bold text-ink">{group.label}</h2><span className="text-xs font-medium text-muted-soft">{group.tasks.length}</span></div>
+                  <div className="border-t border-stroke"><TaskList tasks={group.tasks} selectedIds={selectedIds} onSelect={toggleSelect} /></div>
+                  {composerKey === key ? <TaskComposer defaultDate={group.key} onCancel={() => setComposerKey(null)} onCreated={() => setComposerKey(null)} className="mt-2" /> : <button type="button" onClick={() => setComposerKey(key)} className="mt-1 inline-flex h-9 items-center gap-2 rounded-md px-1 text-sm font-medium text-muted hover:text-primary"><Plus className="size-4 text-primary" />Add task</button>}
+                </div>;
+              })}
             </div>
-          ) : (
-            <section className="rounded-xl border border-stroke bg-surface px-6 py-14 text-center shadow-card"><p className="text-sm font-semibold text-ink">You’re all clear</p><p className="mt-1 text-sm text-muted">Use Add task in the sidebar when something new comes up.</p></section>
+          ) : <EmptyTasks message="Your inbox is clear." />
+        ) : filter.type === "today" ? (
+          isLoading ? <div className="h-36 animate-pulse border-t border-stroke" /> : (
+            <div>
+              {filtered.length ? <div className="border-t border-stroke"><TaskList tasks={filtered} selectedIds={selectedIds} onSelect={toggleSelect} /></div> : <EmptyTasks message="Nothing scheduled for today." compact />}
+              {composerKey === "today" ? <TaskComposer defaultDate={new Date().toLocaleDateString("en-CA")} onCancel={() => setComposerKey(null)} onCreated={() => setComposerKey(null)} className="mt-2" /> : <button type="button" onClick={() => setComposerKey("today")} className="mt-2 inline-flex h-9 items-center gap-2 rounded-md px-1 text-sm font-medium text-muted hover:text-primary"><Plus className="size-4 text-primary" />Add task</button>}
+            </div>
           )
         ) : (
           <section className="overflow-hidden rounded-xl border border-stroke bg-surface shadow-card">
-            {isLoading ? (
-              <div className="space-y-0 divide-y divide-stroke">
-                {[0, 1, 2, 3].map((item) => <div key={item} className="flex items-center gap-3 px-5 py-4"><div className="size-5 animate-pulse rounded-full bg-surface-subtle" /><div className="h-4 w-1/3 animate-pulse rounded bg-surface-subtle" /></div>)}
-              </div>
-            ) : (
-              <TaskList tasks={filtered} selectedIds={selectedIds} onSelect={toggleSelect} reorderable={filter.type === "project"} />
-            )}
+            {isLoading ? <div className="h-48 animate-pulse bg-surface-subtle" /> : <TaskList tasks={filtered} selectedIds={selectedIds} onSelect={toggleSelect} reorderable={filter.type === "project"} />}
           </section>
         )}
       </div>

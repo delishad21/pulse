@@ -47,7 +47,7 @@ function nextInput(task: Task, completedAt: Date, timezone: string): CreateTaskI
     deltaMs=new Date(next).getTime()-completedAt.getTime(); startAt=next;
   }
   return {
-    title:task.title, description:task.description, priority:task.priority, startAt, endAt, dueDate, dueAt,
+    title:task.title, description:task.description, location:task.location, priority:task.priority, startAt, endAt, dueDate, dueAt,
     recurrenceRule:nextRule, projectId:task.projectId, parentTaskId:task.parentTaskId, sortOrder:task.sortOrder,
     tagIds:task.tags.map((tag)=>tag.id),
     reminders:task.reminders.map((r)=>({remindAt:shiftInstant(r.remindAt,deltaMs)!,channel:r.channel})),

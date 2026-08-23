@@ -20,6 +20,7 @@ export interface TaskReminderInput { remindAt: string; channel?: string; }
 export interface CreateTaskInput {
   title: string;
   description?: string | null;
+  location?: string | null;
   priority?: Priority;
   startAt?: string | null;
   endAt?: string | null;
@@ -36,6 +37,7 @@ export interface CreateTaskInput {
 export interface UpdateTaskInput {
   title?: string;
   description?: string | null;
+  location?: string | null;
   priority?: Priority;
   startAt?: string | null;
   endAt?: string | null;

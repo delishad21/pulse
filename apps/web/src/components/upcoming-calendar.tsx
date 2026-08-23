@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import type { Task } from "@pulse/api-client";
 import { useCompleteTask, useReopenTask, useTasks } from "@/hooks/use-tasks";
 import { localDateKey, monthGrid, taskDateKey, weekDays } from "@/lib/task-dates";
 import { cn } from "@/lib/utils";
 import { Shell } from "./shell";
 import { TaskModal } from "./task-modal";
+import { TaskComposer } from "./task-composer";
 
 type UpcomingView = "week" | "month";
 
@@ -38,6 +39,7 @@ export function UpcomingCalendar() {
   const isLoading = openTasks.isLoading || (showCompleted && completedTasks.isLoading);
   const [view, setView] = useState<UpcomingView>("week");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [composerDate, setComposerDate] = useState<string | null>(null);
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const week = useMemo(() => weekDays(), []);
   const calendarDays = useMemo(() => monthGrid(month), [month]);
@@ -74,8 +76,13 @@ export function UpcomingCalendar() {
                   const dayTasks = tasksForDate(tasks, day);
                   const key = localDateKey(day);
                   return (
-                    <div key={key} className="min-h-[220px] space-y-2 px-0.5 md:min-h-[360px] md:px-1">
+                    <div key={key} data-week-day={key} className="relative min-h-[220px] space-y-2 px-0.5 md:min-h-[360px] md:px-1">
                       {dayTasks.map((task) => <WeekTask key={task.id} task={task} onOpen={() => setSelectedTask(task)} />)}
+                      {composerDate === key ? (
+                        <TaskComposer defaultDate={key} onCancel={() => setComposerDate(null)} onCreated={() => setComposerDate(null)} className="relative z-40 w-[min(560px,85vw)]" />
+                      ) : (
+                        <button type="button" onClick={() => setComposerDate(key)} className="inline-flex h-8 items-center gap-1.5 px-1 text-xs font-semibold text-muted hover:text-primary"><Plus className="size-3.5 text-primary" />Add task</button>
+                      )}
                     </div>
                   );
                 })}

@@ -5,7 +5,7 @@ import type { Reminder, Task } from "@pulse/api-client";
 import { createPulseMcpServer, type PulseMcpApi } from "../src/server.js";
 
 const reminder=(overrides:Partial<Reminder>={}):Reminder=>({id:"rem-1",taskId:"task-1",userId:"user-1",remindAt:"2026-08-23T02:30:00.000Z",channel:"hermes_telegram",status:"pending",createdAt:"2026-08-21T00:00:00.000Z",updatedAt:"2026-08-21T00:00:00.000Z",deletedAt:null,...overrides});
-function task(overrides:Partial<Task>={}):Task{return{id:"task-1",userId:"user-1",title:"Test task",description:null,status:"open",priority:"none",startAt:null,endAt:null,due:{date:null,at:null},recurrenceRule:null,completedAt:null,deletedAt:null,projectId:null,parentTaskId:null,sortOrder:0,revision:1,tags:[],reminders:[],createdAt:"2026-08-21T00:00:00.000Z",updatedAt:"2026-08-21T00:00:00.000Z",...overrides};}
+function task(overrides:Partial<Task>={}):Task{return{id:"task-1",userId:"user-1",title:"Test task",description:null,location:null,status:"open",priority:"none",startAt:null,endAt:null,due:{date:null,at:null},recurrenceRule:null,completedAt:null,deletedAt:null,projectId:null,parentTaskId:null,sortOrder:0,revision:1,tags:[],reminders:[],createdAt:"2026-08-21T00:00:00.000Z",updatedAt:"2026-08-21T00:00:00.000Z",...overrides};}
 function makeApi(){
   const calls:Array<{method:string;args:unknown[]}>=[];
   const api:PulseMcpApi={

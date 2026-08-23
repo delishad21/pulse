@@ -11,7 +11,7 @@ const IdParam=z.object({id:z.string().min(1)});
 const Recurrence=z.string().max(1000).nullable().optional();
 const ReminderInput=z.object({remindAt:ISOInstantSchema,channel:z.string().min(1).max(50).optional()});
 const TaskFields=z.object({
-  title:z.string().min(1).max(500),description:z.string().max(10000).nullable().optional(),priority:PrioritySchema.optional(),
+  title:z.string().min(1).max(500),description:z.string().max(10000).nullable().optional(),location:z.string().max(500).nullable().optional(),priority:PrioritySchema.optional(),
   startAt:ISOInstantSchema.nullable().optional(),endAt:ISOInstantSchema.nullable().optional(),dueDate:ISODateSchema.nullable().optional(),dueAt:ISOInstantSchema.nullable().optional(),
   recurrenceRule:Recurrence,projectId:z.string().nullable().optional(),parentTaskId:z.string().nullable().optional(),sortOrder:z.number().int().min(0).optional(),tagIds:z.array(z.string()).max(100).optional(),reminders:z.array(ReminderInput).max(20).optional(),
 });

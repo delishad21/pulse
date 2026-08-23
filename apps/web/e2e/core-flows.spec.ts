@@ -5,7 +5,7 @@ async function addTask(page: Page, text: string) {
   const dialog = page.getByRole("dialog", { name: "Add task" });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel("Smart task").fill(text);
-  await dialog.getByRole("button", { name: "Add task", exact: true }).click();
+  await dialog.getByRole("button", { name: "Submit task" }).click();
   await expect(dialog).toHaveCount(0);
 }
 
@@ -40,10 +40,11 @@ test("sidebar task creation, natural scheduling, and date grouping replace inlin
   await expect(timedRow).toContainText(/3:30|15:30/);
 
   await page.goto("/");
+  await expect(page).toHaveURL(/\/inbox$/);
   await expect(page.getByRole("heading", { name: "Tomorrow" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "No date" })).toBeVisible();
 
-  await page.getByRole("heading", { name: "Dashboard" }).click();
+  await page.getByRole("heading", { name: "Inbox" }).click();
   await page.keyboard.press("q");
   await expect(page.getByRole("dialog", { name: "Add task" })).toBeVisible();
   await page.keyboard.press("Escape");
@@ -57,9 +58,11 @@ test("sidebar task creation, natural scheduling, and date grouping replace inlin
 
 test("project defaults, @label/^priority detection, schedule windows, reminders, and bulk operations work", async ({ page }) => {
   await page.goto("/settings");
-  await page.getByLabel("New label").fill("E2ELabel");
-  await page.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByText("@E2ELabel")).toBeVisible();
+  await page.getByRole("button", { name: "Add label" }).click();
+  const labelDialog = page.getByRole("dialog", { name: "Add label" });
+  await labelDialog.getByLabel("Label name").fill("E2ELabel");
+  await labelDialog.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByText("E2ELabel", { exact: true })).toBeVisible();
 
   await page.goto("/projects");
   await page.getByPlaceholder("New project name").fill("E2EProject");
@@ -70,17 +73,16 @@ test("project defaults, @label/^priority detection, schedule windows, reminders,
 
   await page.getByRole("button", { name: "Add task", exact: true }).first().click();
   const dialog = page.getByRole("dialog", { name: "Add task" });
-  await expect(dialog.getByLabel("Project")).toHaveValue(/.+/);
+  await expect(dialog.getByRole("button", { name: "E2EProject" })).toBeVisible();
   const smart = dialog.getByLabel("Smart task");
   await smart.fill("Project task @E2ELabel ^high 2099-01-05 2pm-4pm");
   await expect(dialog.locator("mark", { hasText: "@E2ELabel" })).toBeVisible();
   await expect(dialog.locator("mark", { hasText: "^high" })).toBeVisible();
-  await expect(dialog.getByLabel("Priority")).toHaveValue("high");
-  await expect(dialog.getByLabel("Start")).not.toHaveValue("");
-  await expect(dialog.getByLabel("End")).not.toHaveValue("");
+  await expect(dialog.getByRole("button", { name: "High" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Reminders" }).click();
   await dialog.getByRole("button", { name: "Add reminder" }).click();
   await dialog.getByLabel("Reminder 1", { exact: true }).fill("2099-01-05T13:30");
-  await dialog.getByRole("button", { name: "Add task", exact: true }).click();
+  await dialog.getByRole("button", { name: "Submit task" }).click();
 
   const row = page.locator("[data-task-id]", { hasText: "Project task" });
   await expect(row).toContainText("high"); await expect(row).toContainText("@E2ELabel"); await expect(row).toContainText(/2:00|14:00/);
@@ -154,13 +156,13 @@ test("upcoming week is Monday-first and month cards open an editable task modal"
 
 test("smart-token highlighting can be cancelled with one Backspace", async ({ page }) => {
   await page.goto("/settings");
-  await page.getByLabel("New label").fill("EscapeLabel"); await page.getByRole("button", { name: "Create" }).click();
+  await page.getByRole("button", { name: "Add label" }).click(); const labelDialog = page.getByRole("dialog", { name: "Add label" }); await labelDialog.getByLabel("Label name").fill("EscapeLabel"); await labelDialog.getByRole("button", { name: "Add", exact: true }).click();
   await page.goto("/inbox"); await page.getByRole("button", { name: "Add task", exact: true }).first().click();
   const dialog = page.getByRole("dialog", { name: "Add task" }); const smart = dialog.getByLabel("Smart task");
   await smart.fill("Literal @EscapeLabel"); await expect(dialog.locator("mark", { hasText: "@EscapeLabel" })).toHaveCount(1);
   await smart.press("End"); await smart.press("Backspace");
   await expect(smart).toHaveValue("Literal @EscapeLabel"); await expect(dialog.locator("mark", { hasText: "@EscapeLabel" })).toHaveCount(0);
-  await dialog.getByRole("button", { name: "Add task", exact: true }).click();
+  await dialog.getByRole("button", { name: "Submit task" }).click();
   await expect(page.locator("[data-task-id]", { hasText: "Literal @EscapeLabel" })).toBeVisible();
 });
 
@@ -173,17 +175,17 @@ test("Inbox, Today and Upcoming can reveal completed tasks", async ({ page }) =>
   await page.goto("/today"); await expect(page.locator("[data-task-id]", { hasText: "TodayView completed toggle" })).toHaveCount(0); await page.getByRole("button", { name: "Show completed" }).click(); await expect(page.locator("[data-task-id]", { hasText: "TodayView completed toggle" })).toBeVisible();
 
   await page.goto("/inbox"); await addTask(page, "UpcomingView completed toggle tomorrow"); row = page.locator("[data-task-id]", { hasText: "UpcomingView completed toggle" }); await row.getByRole("checkbox", { name: "Mark as completed" }).click();
-  await page.goto("/upcoming"); await expect(page.getByTestId("week-task").filter({ hasText: "UpcomingView completed toggle" })).toHaveCount(0); await page.getByRole("button", { name: "Show completed" }).click(); await expect(page.getByTestId("week-task").filter({ hasText: "UpcomingView completed toggle" })).toBeVisible();
+  await page.goto("/upcoming"); await page.getByRole("button", { name: "Month" }).click(); await expect(page.getByTestId("month-task").filter({ hasText: "UpcomingView completed toggle" })).toHaveCount(0); await page.getByRole("button", { name: "Show completed" }).click(); await expect(page.getByTestId("month-task").filter({ hasText: "UpcomingView completed toggle" })).toBeVisible();
 });
 
 test("mobile drawer exposes the global add modal and can submit a task", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/inbox");
   await page.getByRole("button", { name: "Toggle navigation" }).click();
-  await page.getByRole("button", { name: "Add task", exact: true }).click();
+  await page.getByRole("complementary").getByRole("button", { name: "Add task", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add task" });
   await dialog.getByLabel("Smart task").fill("Mobile E2E tomorrow at 9am");
-  const submit = dialog.getByRole("button", { name: "Add task", exact: true });
+  const submit = dialog.getByRole("button", { name: "Submit task" });
   await submit.scrollIntoViewIfNeeded();
   await submit.click();
   await expect(dialog).toHaveCount(0);

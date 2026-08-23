@@ -82,6 +82,7 @@ export interface Task {
   userId: UserId;
   title: string;
   description: string | null;
+  location: string | null;
   status: TaskStatus;
   priority: Priority;
   startAt: string | null;

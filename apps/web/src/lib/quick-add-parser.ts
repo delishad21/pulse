@@ -1,7 +1,7 @@
 import type { CreateTaskInput, Project, Tag } from "@pulse/api-client";
 import { generateRecurrenceRule, type Priority, type Weekday } from "@pulse/domain";
 
-export type DetectionType="date"|"time"|"project"|"label"|"priority"|"recurrence";
+export type DetectionType="date"|"time"|"project"|"label"|"priority"|"recurrence"|"location";
 export interface DetectedToken { id:string; type:DetectionType; start:number; end:number; text:string; label:string; }
 export interface QuickAddContext { projects?:Project[]; tags?:Tag[]; defaultProjectId?:string|null; now?:Date; ignoredTokenIds?:Set<string>; }
 export interface QuickAddDetailed { input:CreateTaskInput; tokens:DetectedToken[]; }
@@ -15,7 +15,6 @@ const PRIORITIES:Record<string,Priority>={none:"none",low:"low",medium:"medium",
 const localDate=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 function validLocalDate(y:number,m:number,d:number){const v=new Date(y,m,d);return v.getFullYear()===y&&v.getMonth()===m&&v.getDate()===d?v:null;}
 function nextWeekday(now:Date,target:number,forceNext:boolean){const v=new Date(now);v.setHours(0,0,0,0);let add=(target-v.getDay()+7)%7;if(forceNext&&add===0)add=7;v.setDate(v.getDate()+add);return v;}
-function byName<T extends {name:string}>(items:T[]|undefined,name:string){return items?.find((item)=>item.name.toLowerCase()===name.toLowerCase());}
 function overlaps(a:Candidate,b:Candidate){return a.start<b.end&&b.start<a.end;}
 function pushCandidate(list:Candidate[],candidate:Candidate){if(!list.some((x)=>overlaps(x,candidate)))list.push(candidate);}
 function tokenise(candidates:Candidate[]):Array<Candidate&{id:string}>{const counts=new Map<string,number>();return [...candidates].sort((a,b)=>a.start-b.start||b.end-a.end).map((c)=>{const base=`${c.type}:${c.text.toLowerCase()}`;const n=counts.get(base)??0;counts.set(base,n+1);return{...c,id:`${base}:${n}`};});}
@@ -57,14 +56,16 @@ function timeCandidate(text:string,blocked:Candidate[]):Candidate|undefined{
 export function parseQuickAddDetailed(text:string,context:QuickAddContext={}):QuickAddDetailed{
   const now=context.now??new Date();const candidates:Candidate[]=[];
   const recurrence=recurrenceCandidate(text);if(recurrence)pushCandidate(candidates,recurrence);
-  const projectRegex=/(?:^|\s)#([\p{L}\p{N}_-]+)/gu;for(const m of text.matchAll(projectRegex)){const project=byName(context.projects,m[1]);if(project&&m.index!==undefined){const prefix=m[0].length-m[0].trimStart().length;pushCandidate(candidates,{type:"project",start:m.index+prefix,end:m.index+m[0].length,text:m[0].trim(),label:project.name,value:project.id});}}
-  const labelRegex=/(?:^|\s)@([\p{L}\p{N}_-]+)/gu;for(const m of text.matchAll(labelRegex)){const tag=byName(context.tags,m[1]);if(tag&&m.index!==undefined){const prefix=m[0].length-m[0].trimStart().length;pushCandidate(candidates,{type:"label",start:m.index+prefix,end:m.index+m[0].length,text:m[0].trim(),label:tag.name,value:tag.id});}}
+  const escaped=(value:string)=>value.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  for(const project of [...(context.projects??[])].sort((a,b)=>b.name.length-a.name.length)){const regex=new RegExp(`(?:^|\\s)(#${escaped(project.name)})(?=\\s|$|[.,;!?])`,"giu");for(const m of text.matchAll(regex)){if(m.index!==undefined){const start=m.index+m[0].indexOf(m[1]);pushCandidate(candidates,{type:"project",start,end:start+m[1].length,text:m[1],label:project.name,value:project.id});}}}
+  for(const tag of [...(context.tags??[])].sort((a,b)=>b.name.length-a.name.length)){const regex=new RegExp(`(?:^|\\s)(@${escaped(tag.name)})(?=\\s|$|[.,;!?])`,"giu");for(const m of text.matchAll(regex)){if(m.index!==undefined){const start=m.index+m[0].indexOf(m[1]);pushCandidate(candidates,{type:"label",start,end:start+m[1].length,text:m[1],label:tag.name,value:tag.id});}}}
   const priorityRegex=/(?:^|\s)\^(none|low|medium|med|high|urgent)\b/giu;for(const m of text.matchAll(priorityRegex)){if(m.index!==undefined){const prefix=m[0].length-m[0].trimStart().length;const p=PRIORITIES[m[1].toLowerCase()];pushCandidate(candidates,{type:"priority",start:m.index+prefix,end:m.index+m[0].length,text:m[0].trim(),label:p[0].toUpperCase()+p.slice(1),value:p});}}
+  const locationRegex=/(?:^|\s)\*(?:"([^"]+)"|([\p{L}\p{N}][\p{L}\p{N}._-]*))/gu;for(const m of text.matchAll(locationRegex)){if(m.index!==undefined){const prefix=m[0].length-m[0].trimStart().length;const value=(m[1]??m[2]).trim();pushCandidate(candidates,{type:"location",start:m.index+prefix,end:m.index+m[0].length,text:m[0].trim(),label:value,value});}}
   const date=dateCandidate(text,now,candidates);if(date)pushCandidate(candidates,date);
   const time=timeCandidate(text,candidates);if(time)pushCandidate(candidates,time);
   const all=tokenise(candidates);const ignored=context.ignoredTokenIds??new Set<string>();const active=all.filter((t)=>!ignored.has(t.id));
   const input:CreateTaskInput={title:"",projectId:context.defaultProjectId??null,priority:"none"};let recurrenceWeekday:number|undefined;
-  for(const token of active){if(token.type==="project")input.projectId=token.value as string;if(token.type==="label")input.tagIds=[...(input.tagIds??[]),token.value as string];if(token.type==="priority")input.priority=token.value as Priority;if(token.type==="recurrence"){const v=token.value as {rule:string;weekday?:number};input.recurrenceRule=v.rule;recurrenceWeekday=v.weekday;}}
+  for(const token of active){if(token.type==="project")input.projectId=token.value as string;if(token.type==="label")input.tagIds=[...(input.tagIds??[]),token.value as string];if(token.type==="priority")input.priority=token.value as Priority;if(token.type==="location")input.location=token.value as string;if(token.type==="recurrence"){const v=token.value as {rule:string;weekday?:number};input.recurrenceRule=v.rule;recurrenceWeekday=v.weekday;}}
   const dateToken=active.find((t)=>t.type==="date");let dateKey=dateToken?.value as string|undefined;
   if(!dateKey&&recurrenceWeekday!==undefined)dateKey=localDate(nextWeekday(now,recurrenceWeekday,false));
   if(!dateKey&&input.recurrenceRule)dateKey=localDate(now);
