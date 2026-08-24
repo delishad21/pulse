@@ -13,5 +13,7 @@ function createPrismaClient(): PrismaClient {
   return new PrismaClient({ adapter: new PrismaPg(pool) });
 }
 
-export const prisma = globalForPrisma.pulsePrisma ?? createPrismaClient();
-if (process.env.NODE_ENV !== "production") globalForPrisma.pulsePrisma = prisma;
+export function getPrismaClient(): PrismaClient {
+  if (!globalForPrisma.pulsePrisma) globalForPrisma.pulsePrisma = createPrismaClient();
+  return globalForPrisma.pulsePrisma;
+}

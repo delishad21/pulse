@@ -21,7 +21,9 @@ services:
     build:
       context: .
       target: api
-    image: pulse-api:local
+    # Set this to a fully-qualified Docker Hub image in production. The local
+    # fallback keeps `docker compose build` useful for development and recovery.
+    image: ${PULSE_API_IMAGE:-pulse-api:local}
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://pulse:${PULSE_DB_PASSWORD}@db:5432/pulse
@@ -50,7 +52,9 @@ services:
     build:
       context: .
       target: web
-    image: pulse-web:local
+    # Set this to a fully-qualified Docker Hub image in production. The local
+    # fallback keeps `docker compose build` useful for development and recovery.
+    image: ${PULSE_WEB_IMAGE:-pulse-web:local}
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://pulse:${PULSE_DB_PASSWORD}@db:5432/pulse

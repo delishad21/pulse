@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   CalendarDays,
   CalendarRange,
-  CircleCheckBig,
   Inbox,
   Menu,
   LogOut,
@@ -102,9 +102,7 @@ export function Shell({ children, defaultProjectId = null }: { children: React.R
   const sidebar = (
     <aside className="flex h-full w-[286px] flex-col border-r border-stroke bg-surface px-4 py-5 dark:border-stroke">
       <div className="flex items-center gap-3 px-2">
-        <div className="flex size-11 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
-          <CircleCheckBig className="size-6" />
-        </div>
+        <Image src="/pulse-waveform-logo.png" alt="Pulse" width={52} height={43} priority className="h-11 w-[52px] object-contain" />
         <div className="min-w-0">
           <p className="text-lg font-extrabold tracking-tight text-ink">Pulse</p>
           <p className="text-xs font-medium text-muted">Tasks, everywhere.</p>
@@ -209,9 +207,12 @@ export function Shell({ children, defaultProjectId = null }: { children: React.R
             >
               {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
             </button>
-            <div className="md:hidden">
+            <div className="flex items-center gap-2 md:hidden">
+              <Image src="/pulse-waveform-logo.png" alt="Pulse" width={34} height={28} priority className="h-7 w-[34px] object-contain" />
+              <div>
               <p className="font-bold text-ink">Pulse</p>
               <p className="text-[11px] text-muted">Your task workspace</p>
+              </div>
             </div>
           </div>
 

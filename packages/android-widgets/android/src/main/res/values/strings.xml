@@ -1,0 +1,7 @@
+<resources>
+  <string name="pulse_widget_today">Pulse Today</string><string name="pulse_widget_today_description">Your open tasks for today.</string>
+  <string name="pulse_widget_inbox">Pulse Inbox</string><string name="pulse_widget_inbox_description">Unscheduled tasks in your inbox.</string>
+  <string name="pulse_widget_upcoming">Pulse Upcoming</string><string name="pulse_widget_upcoming_description">Your next scheduled tasks.</string>
+  <string name="pulse_widget_overdue">Pulse Overdue</string><string name="pulse_widget_overdue_description">Tasks that need your attention.</string>
+  <string name="pulse_widget_tasks">Pulse Tasks</string><string name="pulse_widget_tasks_description">A customizable task list.</string>
+</resources>

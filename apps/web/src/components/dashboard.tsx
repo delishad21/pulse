@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, Check, CheckCircle2, FolderInput, Plus, RotateCcw, RotateCw, Trash2, X } from "lucide-react";
-import { useTasks, useTaskView, useBulkTasks, useBulkMoveTasks, useBulkRescheduleTasks } from "@/hooks/use-tasks";
+import { CheckCircle2, Plus, RotateCcw, RotateCw } from "lucide-react";
+import type { Task } from "@pulse/api-client";
+import { useTasks, useTaskView } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { useUndo, useRedo, useHistory } from "@/hooks/use-history";
 import { TaskList } from "./task-list";
 import { TaskComposer } from "./task-composer";
+import { TaskCreateModal } from "./task-create-modal";
+import { TaskViewFilter } from "./task-view-filter";
 import { Shell } from "./shell";
 import { filterTasks, type DashboardFilter } from "@/lib/dashboard-filters";
-import { groupTasksByDate } from "@/lib/task-dates";
+import { groupTasksByDate, localDateKey } from "@/lib/task-dates";
 
 interface DashboardProps {
   title: string;
@@ -45,62 +48,60 @@ function EmptyTasks({ message, compact = false }: { message: string; compact?: b
   </div>;
 }
 
+function isOverdueTask(task: Task): boolean {
+  if (task.due.date) return task.due.date < localDateKey(new Date());
+  return Boolean(task.due.at && new Date(task.due.at).getTime() < Date.now());
+}
+
+function OverdueSection({ tasks, onEditTask }: {
+  tasks: Task[];
+  onEditTask: (task: Task) => void;
+}) {
+  if (!tasks.length) return null;
+  return <section data-testid="overdue-section" className="mb-8">
+    <div className="mb-2 flex items-baseline gap-2"><h2 className="text-sm font-bold text-danger">Overdue</h2><span className="text-xs font-medium text-muted-soft">{tasks.length}</span></div>
+    <div className="border-t border-danger/30"><TaskList tasks={tasks} onEditTask={onEditTask} /></div>
+  </section>;
+}
+
 export function Dashboard({ title, filter, header }: DashboardProps) {
   const canonicalView = filter.type === "inbox" || filter.type === "today" ? filter.type : null;
   const [showCompleted, setShowCompleted] = useState(false);
+  const [includeProjectTasks, setIncludeProjectTasks] = useState(false);
+  const canFilterProjectTasks = filter.type !== "project" && !(filter.type === "filters" && Boolean(filter.projectId));
   const listQuery = useTasks(getTasksQuery(filter), canonicalView === null);
   const viewQuery = useTaskView(canonicalView ?? "inbox", canonicalView !== null, showCompleted);
-  const tasksQuery = canonicalView ? viewQuery : listQuery;
+  const allInboxQuery = useTasks(undefined, filter.type === "inbox" && includeProjectTasks);
+  const tasksQuery = filter.type === "inbox" && includeProjectTasks ? allInboxQuery : canonicalView ? viewQuery : listQuery;
   const tasks = tasksQuery.data;
-  const isLoading = tasksQuery.isLoading;
+  const overdueQuery = useTaskView("overdue", filter.type === "today");
+  const isLoading = tasksQuery.isLoading || (filter.type === "today" && overdueQuery.isLoading);
   const { data: projects } = useProjects();
-  const bulk = useBulkTasks();
-  const bulkMove = useBulkMoveTasks();
-  const bulkReschedule = useBulkRescheduleTasks();
   const undo = useUndo();
   const redo = useRedo();
   const { data: history } = useHistory();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [moveProjectId, setMoveProjectId] = useState("");
-  const [bulkDueDate, setBulkDueDate] = useState("");
   const [composerKey, setComposerKey] = useState<string | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
-  const filtered = tasks
+  const rawFiltered = tasks
     ? (filter.type === "inbox" || filter.type === "today")
       ? tasks
       : filterTasks(tasks, filter)
-    : [];
+      : [];
+  const filtered = filter.type === "inbox" && includeProjectTasks
+    ? rawFiltered.filter((task) => task.status === "open" || (showCompleted && task.status === "completed"))
+    : canFilterProjectTasks && !includeProjectTasks
+      ? rawFiltered.filter((task) => task.projectId === null)
+      : rawFiltered;
+  const overdueTasks = filter.type === "today"
+    ? (overdueQuery.data ?? []).filter((task) => includeProjectTasks || task.projectId === null)
+    : filtered.filter(isOverdueTask);
+  const visibleTasks = filter.type === "inbox" ? filtered.filter((task) => !isOverdueTask(task)) : filtered;
+  const visibleCount = filtered.length + (filter.type === "today" ? overdueTasks.length : 0);
   const project =
     filter.type === "project"
       ? projects?.find((p) => p.id === filter.projectId)
       : undefined;
-
-  const toggleSelect = (id: string, selected: boolean) => {
-    setSelectedIds((prev) =>
-      selected ? [...prev, id] : prev.filter((x) => x !== id),
-    );
-  };
-
-  const runBulk = (action: "complete" | "delete") => {
-    if (selectedIds.length === 0) return;
-    bulk.mutate({ ids: selectedIds, action }, { onSuccess: () => setSelectedIds([]) });
-  };
-
-  const runBulkMove = () => {
-    if (selectedIds.length === 0) return;
-    bulkMove.mutate(
-      { ids: selectedIds, projectId: moveProjectId || null },
-      { onSuccess: () => setSelectedIds([]) },
-    );
-  };
-
-  const runBulkReschedule = () => {
-    if (selectedIds.length === 0) return;
-    bulkReschedule.mutate(
-      { ids: selectedIds, dueDate: bulkDueDate || null },
-      { onSuccess: () => setSelectedIds([]) },
-    );
-  };
 
   return (
     <Shell defaultProjectId={filter.type === "project" ? filter.projectId : null}>
@@ -112,15 +113,16 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
                 {project ? project.name : title}
               </h1>
               <span className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">
-                {filtered.length}
+                {visibleCount}
               </span>
             </div>
             <p className="mt-1 text-sm font-medium text-muted">
-              {filtered.length === 0 ? "Nothing demanding your attention." : `${filtered.length} task${filtered.length === 1 ? "" : "s"} in this view`}
+              {visibleCount === 0 ? "Nothing demanding your attention." : `${visibleCount} task${visibleCount === 1 ? "" : "s"} in this view`}
             </p>
           </div>
 
           <div className="flex items-center gap-1 rounded-lg border border-stroke bg-surface p-1 shadow-sm">
+            {canFilterProjectTasks ? <TaskViewFilter includeProjectTasks={includeProjectTasks} onIncludeProjectTasksChange={setIncludeProjectTasks} /> : null}
             {canonicalView ? <button type="button" onClick={() => setShowCompleted((value) => !value)} aria-pressed={showCompleted} className="h-9 rounded-md px-3 text-xs font-semibold text-muted transition hover:bg-surface-subtle hover:text-ink">{showCompleted ? "Hide completed" : "Show completed"}</button> : null}
             <button
               type="button"
@@ -147,53 +149,17 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
 
         {header ? <div className="mb-5">{header}</div> : null}
 
-        {selectedIds.length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-primary-soft p-2.5 shadow-sm">
-            <span className="px-2 text-sm font-semibold text-primary">{selectedIds.length} selected</span>
-            <button type="button" onClick={() => runBulk("complete")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-white hover:bg-primary/90">
-              <Check className="size-4" /> Complete
-            </button>
-            <button type="button" onClick={() => runBulk("delete")} className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-danger hover:bg-white/70 dark:hover:bg-surface">
-              <Trash2 className="size-4" /> Delete
-            </button>
-
-            <div className="flex min-w-[230px] items-center gap-1 rounded-lg border border-primary/15 bg-surface p-1">
-              <FolderInput className="ml-2 size-4 text-muted" />
-              <select
-                aria-label="Move selected tasks to project"
-                value={moveProjectId}
-                onChange={(event) => setMoveProjectId(event.target.value)}
-                className="min-w-0 flex-1 bg-transparent px-1 text-sm text-ink outline-none"
-              >
-                <option value="">Inbox</option>
-                {projects?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select>
-
-              <button type="button" onClick={runBulkMove} className="rounded-md px-2 py-1.5 text-xs font-bold text-primary hover:bg-primary-soft">Move</button>
-            </div>
-
-            <div className="flex items-center gap-1 rounded-lg border border-primary/15 bg-surface p-1">
-              <CalendarClock className="ml-2 size-4 text-muted" />
-              <input type="date" aria-label="Reschedule selected tasks" value={bulkDueDate} onChange={(event) => setBulkDueDate(event.target.value)} className="bg-transparent px-1 text-sm text-ink outline-none" />
-              <button type="button" onClick={runBulkReschedule} className="rounded-md px-2 py-1.5 text-xs font-bold text-primary hover:bg-primary-soft">{bulkDueDate ? "Reschedule" : "Clear due"}</button>
-            </div>
-
-            <button type="button" onClick={() => setSelectedIds([])} className="ml-auto flex size-9 items-center justify-center rounded-lg text-primary hover:bg-white/70 dark:hover:bg-surface" aria-label="Clear selection">
-              <X className="size-4" />
-            </button>
-          </div>
-        )}
-
         {filter.type === "inbox" ? (
           isLoading ? (
             <div className="space-y-7">{[0, 1].map((item) => <div key={item}><div className="mb-2 h-4 w-28 animate-pulse rounded bg-surface-subtle" /><div className="h-28 animate-pulse border-t border-stroke bg-surface/20" /></div>)}</div>
-          ) : filtered.length ? (
+          ) : visibleCount ? (
             <div className="space-y-8">
-              {groupTasksByDate(filtered).map((group) => {
+              <OverdueSection tasks={overdueTasks} onEditTask={setEditingTask} />
+              {groupTasksByDate(visibleTasks).map((group) => {
                 const key = group.key ?? "no-date";
                 return <div key={key} data-date-group={key}>
                   <div className="mb-1 flex items-baseline gap-2"><h2 className="text-sm font-bold text-ink">{group.label}</h2><span className="text-xs font-medium text-muted-soft">{group.tasks.length}</span></div>
-                  <div className="border-t border-stroke"><TaskList tasks={group.tasks} selectedIds={selectedIds} onSelect={toggleSelect} /></div>
+                  <div className="border-t border-stroke"><TaskList tasks={group.tasks} onEditTask={setEditingTask} /></div>
                   {composerKey === key ? <TaskComposer defaultDate={group.key} onCancel={() => setComposerKey(null)} onCreated={() => setComposerKey(null)} className="mt-2" /> : <button type="button" onClick={() => setComposerKey(key)} className="mt-1 inline-flex h-9 items-center gap-2 rounded-md px-1 text-sm font-medium text-muted hover:text-primary"><Plus className="size-4 text-primary" />Add task</button>}
                 </div>;
               })}
@@ -202,16 +168,18 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
         ) : filter.type === "today" ? (
           isLoading ? <div className="h-36 animate-pulse border-t border-stroke" /> : (
             <div>
-              {filtered.length ? <div className="border-t border-stroke"><TaskList tasks={filtered} selectedIds={selectedIds} onSelect={toggleSelect} /></div> : <EmptyTasks message="Nothing scheduled for today." compact />}
-              {composerKey === "today" ? <TaskComposer defaultDate={new Date().toLocaleDateString("en-CA")} onCancel={() => setComposerKey(null)} onCreated={() => setComposerKey(null)} className="mt-2" /> : <button type="button" onClick={() => setComposerKey("today")} className="mt-2 inline-flex h-9 items-center gap-2 rounded-md px-1 text-sm font-medium text-muted hover:text-primary"><Plus className="size-4 text-primary" />Add task</button>}
+              <OverdueSection tasks={overdueTasks} onEditTask={setEditingTask} />
+              {filtered.length ? <div className="border-t border-stroke"><TaskList tasks={filtered} onEditTask={setEditingTask} /></div> : overdueTasks.length ? null : <EmptyTasks message="Nothing scheduled for today." compact />}
+              {composerKey === "today" ? <TaskComposer defaultDate={localDateKey(new Date())} onCancel={() => setComposerKey(null)} onCreated={() => setComposerKey(null)} className="mt-2" /> : <button type="button" onClick={() => setComposerKey("today")} className="mt-2 inline-flex h-9 items-center gap-2 rounded-md px-1 text-sm font-medium text-muted hover:text-primary"><Plus className="size-4 text-primary" />Add task</button>}
             </div>
           )
         ) : (
-          <section className="overflow-hidden rounded-xl border border-stroke bg-surface shadow-card">
-            {isLoading ? <div className="h-48 animate-pulse bg-surface-subtle" /> : <TaskList tasks={filtered} selectedIds={selectedIds} onSelect={toggleSelect} reorderable={filter.type === "project"} />}
+          <section className="border-t border-stroke">
+            {isLoading ? <div className="h-48 animate-pulse bg-surface-subtle" /> : <TaskList tasks={filtered} onEditTask={setEditingTask} reorderable={filter.type === "project"} />}
           </section>
         )}
       </div>
+      <TaskCreateModal key={editingTask?.id ?? "closed"} open={Boolean(editingTask)} task={editingTask} onClose={() => setEditingTask(null)} />
     </Shell>
   );
 }

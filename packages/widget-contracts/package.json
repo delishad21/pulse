@@ -10,9 +10,11 @@
     "fastify": "^5.12.1"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test src/*.test.ts"
   },
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "typescript": "^6.0.3"
   }
 }

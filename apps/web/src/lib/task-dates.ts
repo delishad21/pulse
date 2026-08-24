@@ -58,6 +58,12 @@ export function weekDays(now = new Date()): Date[] {
   });
 }
 
+export function weekDateLabel(date: Date): string {
+  const dayAndMonth = date.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+  const weekday = date.toLocaleDateString("en-GB", { weekday: "long" });
+  return `${dayAndMonth}, ${weekday}`;
+}
+
 export function monthGrid(month: Date): Date[] {
   const first = new Date(month.getFullYear(), month.getMonth(), 1);
   const gridStart = startOfCurrentWeek(first);

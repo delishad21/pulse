@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { z } from "zod";
-import { prisma } from "@pulse/db/next";
+import { getPrismaClient } from "@pulse/db/next";
 
 const schema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -17,6 +17,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid registration details." }, { status: 400 });
   }
+  const prisma = getPrismaClient();
   const existing = await prisma.user.findUnique({ where: { username: parsed.data.username } });
   if (existing) return NextResponse.json({ error: "That username is already taken." }, { status: 409 });
   const passwordHash = await hash(parsed.data.password, 12);

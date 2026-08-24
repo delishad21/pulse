@@ -10,6 +10,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "postinstall": "patch-package",
     "dev:api": "npm run dev -w @pulse/api",
     "dev:web": "npm run dev -w @pulse/web",
     "dev:mobile": "npm run start -w @pulse/mobile",
@@ -24,6 +25,12 @@
   },
   "dependencies": {
     "dotenv": "^16.6.1",
-    "fastify": "^5.12.1"
+    "fastify": "^5.12.1",
+    "expo": "~57.0.15",
+    "react": "19.2.3",
+    "react-native": "0.86.2"
+  },
+  "devDependencies": {
+    "patch-package": "^8.0.1"
   }
 }

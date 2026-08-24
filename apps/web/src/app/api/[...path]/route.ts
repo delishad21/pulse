@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { readMobileBearerToken } from "@/lib/mobile-auth";
 
 const apiOrigin = process.env.PULSE_API_INTERNAL_URL ?? "http://127.0.0.1:4000";
 type RouteContext = { params: Promise<{ path: string[] }> };
@@ -8,7 +9,9 @@ type RouteContext = { params: Promise<{ path: string[] }> };
 async function proxy(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   const authDisabled = process.env.PULSE_AUTH_DISABLED === "true";
   const session = authDisabled ? null : await auth();
-  if (!authDisabled && !session?.user?.id) {
+  const mobileClaims = authDisabled || session?.user?.id ? null : readMobileBearerToken(request);
+  const userId = session?.user?.id ?? mobileClaims?.sub;
+  if (!authDisabled && !userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -19,7 +22,7 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
   for (const name of ["host", "content-length", "x-pulse-user-id"]) headers.delete(name);
   const webToken = process.env.PULSE_WEB_TOKEN;
   if (webToken) headers.set("authorization", `Bearer ${webToken}`);
-  if (session?.user?.id) headers.set("x-pulse-user-id", session.user.id);
+  if (userId) headers.set("x-pulse-user-id", userId);
 
   const method = request.method.toUpperCase();
   const body = method === "GET" || method === "HEAD" ? undefined : await request.arrayBuffer();

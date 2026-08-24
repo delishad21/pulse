@@ -1,5 +1,29 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Product Sans";
+  src: url("/fonts/ProductSans-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Product Sans";
+  src: url("/fonts/ProductSans-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Product Sans";
+  src: url("/fonts/ProductSans-Italic.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+
 @variant dark (&:where(.dark, .dark *));
 
 @theme {
@@ -16,8 +40,8 @@
   --color-danger: #f23030;
   --color-warning: #f59e0b;
   --color-info: #3b82f6;
-  --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: "Product Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --shadow-card: 0 1px 3px rgba(17, 25, 40, 0.08);
   --shadow-float: 0 18px 48px rgba(17, 25, 40, 0.16);
 }
@@ -29,6 +53,7 @@
   --pulse-stroke: #e6ebf1;
   --pulse-ink: #111928;
   --pulse-muted: #6b7280;
+  --pulse-muted-soft: #9ca3af;
   --pulse-primary: #dc4c3e;
   --pulse-primary-soft: #fff0ee;
   color-scheme: light;
@@ -40,6 +65,7 @@ html.dark {
   --pulse-stroke: #1a2432;
   --pulse-ink: #f8fafc;
   --pulse-muted: #9aa7b8;
+  --pulse-muted-soft: #718096;
   --pulse-primary-soft: rgba(220, 76, 62, 0.16);
   color-scheme: dark;
 }
@@ -60,7 +86,7 @@ body {
   margin: 0;
   background: var(--pulse-canvas);
   color: var(--pulse-ink);
-  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Product Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -108,10 +134,19 @@ html.dark .pulse-scrollbar::-webkit-scrollbar-thumb {
   background: #1a2432;
 }
 
-input[type="date"] {
-  color-scheme: light;
+.smart-task-editor:empty::before {
+  color: var(--pulse-muted-soft);
+  content: attr(data-placeholder);
+  opacity: 0.75;
+  pointer-events: none;
 }
 
-html.dark input[type="date"] {
-  color-scheme: dark;
+.smart-task-token {
+  border: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  margin: 0;
+  padding: 0;
 }

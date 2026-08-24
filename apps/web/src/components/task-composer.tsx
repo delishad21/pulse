@@ -2,18 +2,19 @@
 
 import { useMemo, useState } from "react";
 import { AlarmClock, ArrowUp, CalendarDays, ChevronDown, Flag, Folder, MapPin, MoreHorizontal, Plus, Repeat2, Tag as TagIcon, Trash2, X } from "lucide-react";
-import type { CreateTaskInput } from "@pulse/api-client";
+import type { CreateTaskInput, Task } from "@pulse/api-client";
 import type { Priority } from "@pulse/domain";
-import { useCreateTask } from "@/hooks/use-tasks";
+import { useCreateTask, useUpdateTask } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { useTags } from "@/hooks/use-tags";
 import { parseQuickAddDetailed } from "@/lib/quick-add-parser";
 import { localDateKey } from "@/lib/task-dates";
 import { cn } from "@/lib/utils";
+import { DatePicker } from "./date-picker";
 import { SmartTaskInput } from "./smart-task-input";
 
 type Menu = "schedule" | "priority" | "reminders" | "project" | "labels" | "location" | "more" | null;
-interface Props { defaultProjectId?: string | null; defaultDate?: string | null; onCancel: () => void; onCreated?: () => void; className?: string; }
+interface Props { task?: Task | null; defaultProjectId?: string | null; defaultDate?: string | null; onCancel: () => void; onCreated?: () => void; className?: string; }
 const weekdays = [["MO", "Monday"], ["TU", "Tuesday"], ["WE", "Wednesday"], ["TH", "Thursday"], ["FR", "Friday"], ["SA", "Saturday"], ["SU", "Sunday"]] as const;
 const priorityTone: Record<Priority, string> = { none: "#64748b", low: "#3b82f6", medium: "#f59e0b", high: "#f97316", urgent: "#ef4444" };
 const toLocalTime = (value?: string | null) => value ? new Date(value).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
@@ -45,33 +46,38 @@ function recurrenceRule(option: string) {
   return null;
 }
 
-function Chip({ active, selected, icon: Icon, children, onClick }: { active?: boolean; selected?: boolean; icon: React.ComponentType<{ className?: string }>; children: React.ReactNode; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className={cn("inline-flex h-8 max-w-[220px] items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition", active ? "border-primary/40 bg-primary-soft text-primary" : selected ? "border-stroke bg-surface-subtle text-ink" : "border-stroke bg-surface text-muted hover:bg-surface-subtle hover:text-ink")}><Icon className="size-3.5 shrink-0" /><span className="truncate">{children}</span><ChevronDown className="size-3 shrink-0 opacity-55" /></button>;
+function Chip({ active, selected, icon: Icon, iconColor, children, onClick }: { active?: boolean; selected?: boolean; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; iconColor?: string; children: React.ReactNode; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className={cn("inline-flex h-8 max-w-[220px] items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition", active ? "border-primary/40 bg-primary-soft text-primary" : selected ? "border-stroke bg-surface-subtle text-ink" : "border-stroke bg-surface text-muted hover:bg-surface-subtle hover:text-ink")}><Icon className="size-3.5 shrink-0" style={iconColor ? { color: iconColor } : undefined} /><span className="truncate">{children}</span><ChevronDown className="size-3 shrink-0 opacity-55" /></button>;
 }
 function Panel({ children }: { children: React.ReactNode }) {
   return <div className="mt-2 rounded-xl border border-stroke bg-surface p-3 shadow-lg">{children}</div>;
 }
 
-export function TaskComposer({ defaultProjectId = null, defaultDate = null, onCancel, onCreated, className }: Props) {
+export function TaskComposer({ task = null, defaultProjectId = null, defaultDate = null, onCancel, onCreated, className }: Props) {
   const createTask = useCreateTask();
+  const updateTask = useUpdateTask();
   const { data: projects } = useProjects();
   const { data: tags } = useTags();
-  const [smartText, setSmartText] = useState("");
+  const [smartText, setSmartText] = useState(task?.title ?? "");
   const [ignored, setIgnored] = useState<Set<string>>(new Set());
-  const parsed = useMemo(() => parseQuickAddDetailed(smartText, { projects, tags, defaultProjectId, ignoredTokenIds: ignored }), [smartText, projects, tags, defaultProjectId, ignored]);
+  const parsed = useMemo(() => task
+    ? { input: { title: smartText.trim() } as CreateTaskInput, tokens: [] }
+    : parseQuickAddDetailed(smartText, { projects, tags, defaultProjectId, ignoredTokenIds: ignored }), [smartText, projects, tags, defaultProjectId, ignored, task]);
   const [menu, setMenu] = useState<Menu>(null);
-  const [manualProject, setManualProject] = useState<string | undefined>();
-  const [manualPriority, setManualPriority] = useState<Priority | undefined>();
-  const [manualTags, setManualTags] = useState<string[] | undefined>();
-  const [manualDate, setManualDate] = useState<string | undefined>();
-  const [manualStart, setManualStart] = useState<string | undefined>();
-  const [manualEnd, setManualEnd] = useState<string | undefined>();
-  const [deadlineDate, setDeadlineDate] = useState("");
-  const [deadlineTime, setDeadlineTime] = useState("");
-  const [manualRecurrence, setManualRecurrence] = useState<string | undefined>();
-  const [manualLocation, setManualLocation] = useState<string | undefined>();
-  const [reminders, setReminders] = useState<string[]>([]);
-  const [description, setDescription] = useState("");
+  const [manualProject, setManualProject] = useState<string | undefined>(task ? task.projectId ?? "" : undefined);
+  const [manualPriority, setManualPriority] = useState<Priority | undefined>(task?.priority);
+  const [manualTags, setManualTags] = useState<string[] | undefined>(task?.tags.map((tag) => tag.id));
+  const [manualDate, setManualDate] = useState<string | undefined>(task ? (task.startAt ? toLocalDate(task.startAt) : task.due.date ?? "") : undefined);
+  const [manualStart, setManualStart] = useState<string | undefined>(task ? toLocalTime(task.startAt) : undefined);
+  const [manualEnd, setManualEnd] = useState<string | undefined>(task ? toLocalTime(task.endAt) : undefined);
+  const [deadlineDate, setDeadlineDate] = useState(task?.due.at ? toLocalDate(task.due.at) : task?.startAt ? task.due.date ?? "" : "");
+  const [deadlineTime, setDeadlineTime] = useState(task?.due.at ? toLocalTime(task.due.at) : "");
+  const [manualRecurrence, setManualRecurrence] = useState<string | undefined>(task ? recurrenceOption(task.recurrenceRule) : undefined);
+  const [manualLocation, setManualLocation] = useState<string | undefined>(task ? task.location ?? "" : undefined);
+  const [reminders, setReminders] = useState<string[]>(task?.reminders.map((reminder) => {
+    const date = new Date(reminder.remindAt); const offset = date.getTimezoneOffset() * 60_000; return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  }) ?? []);
+  const [description, setDescription] = useState(task?.description ?? "");
   const [labelFilter, setLabelFilter] = useState("");
 
   const projectId = manualProject !== undefined ? (manualProject || null) : (parsed.input.projectId ?? defaultProjectId ?? null);
@@ -115,32 +121,36 @@ export function TaskComposer({ defaultProjectId = null, defaultDate = null, onCa
       else { input.dueDate = deadlineDate; input.dueAt = null; }
     } else if (!startAt) { input.dueDate = taskDate || null; input.dueAt = null; }
     else { input.dueDate = null; input.dueAt = null; }
-    createTask.mutate(input, { onSuccess: () => { onCreated?.(); onCancel(); } });
+    const onSuccess = () => { onCreated?.(); onCancel(); };
+    if (task) updateTask.mutate({ id: task.id, input }, { onSuccess });
+    else createTask.mutate(input, { onSuccess });
   };
 
   const scheduleLabel = startTime
     ? `${taskDate ? new Date(`${taskDate}T00:00:00`).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) : "Date"} ${startTime}${endTime ? `–${endTime}` : ""}`
     : taskDate ? new Date(`${taskDate}T00:00:00`).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) : "Date";
   const reminderLabel = reminders.length ? `${reminders.length} reminder${reminders.length === 1 ? "" : "s"}` : "Reminders";
-  const labelText = selectedTags.length ? selectedTags.map((tag) => `@${tag.name}`).join(", ") : "Labels";
+  const labelText = selectedTags.length ? selectedTags.map((tag) => tag.name).join(", ") : "Labels";
+  const isSaving = task ? updateTask.isPending : createTask.isPending;
 
   return (
-    <form onSubmit={submit} className={cn("relative rounded-xl border border-stroke bg-surface p-3 shadow-float", className)}>
+    <form onSubmit={submit} className={cn("relative rounded-xl border-0 bg-surface p-3 shadow-float", className)}>
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <SmartTaskInput compact value={smartText} onChange={setSmartText} tokens={parsed.tokens} ignoredTokenIds={ignored} onIgnoreToken={(id) => setIgnored((old) => new Set(old).add(id))} tags={tags} projects={projects} placeholder="Task name · tomorrow 3pm · #project · @label · ^high · *place" />
+          <SmartTaskInput compact autoFocus value={smartText} onChange={setSmartText} tokens={parsed.tokens} ignoredTokenIds={ignored} onIgnoreToken={(id) => setIgnored((old) => new Set(old).add(id))} tags={task ? [] : tags} projects={task ? [] : projects} placeholder="Task title" />
+          <textarea aria-label="Task description" value={description} onChange={(event) => setDescription(event.target.value)} rows={2} placeholder="Description (optional)" style={{ border: 0, outline: "none", boxShadow: "none" }} className="mt-1 min-h-[48px] w-full resize-none appearance-none border-0 bg-transparent px-2 py-1 text-sm leading-6 text-ink outline-none ring-0 shadow-none placeholder:text-muted-soft placeholder:opacity-75 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none" />
         </div>
-        <button type="button" onClick={onCancel} aria-label="Cancel add task" className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-subtle hover:text-ink"><X className="size-4" /></button>
+        <button type="button" onClick={onCancel} aria-label={task ? "Cancel edit task" : "Cancel add task"} className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-lg text-muted outline-none hover:bg-surface-subtle hover:text-ink focus:outline-none focus:ring-0 focus-visible:outline-none"><X className="size-4" /></button>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <Chip icon={CalendarDays} active={menu === "schedule"} selected={Boolean(taskDate || startTime || recurrence !== "none")} onClick={() => toggleMenu("schedule")}>{scheduleLabel}</Chip>
-        <Chip icon={Flag} active={menu === "priority"} selected={priority !== "none"} onClick={() => toggleMenu("priority")}>{priority === "none" ? "Priority" : priority[0]!.toUpperCase() + priority.slice(1)}</Chip>
+        <Chip icon={Flag} iconColor={priority !== "none" ? priorityTone[priority] : undefined} active={menu === "priority"} selected={priority !== "none"} onClick={() => toggleMenu("priority")}>{priority === "none" ? "Priority" : priority[0]!.toUpperCase() + priority.slice(1)}</Chip>
         <Chip icon={AlarmClock} active={menu === "reminders"} selected={reminders.length > 0} onClick={() => toggleMenu("reminders")}>{reminderLabel}</Chip>
-        <Chip icon={Folder} active={menu === "project"} selected={Boolean(projectId)} onClick={() => toggleMenu("project")}>{selectedProject?.name ?? "Inbox"}</Chip>
-        <Chip icon={TagIcon} active={menu === "labels"} selected={selectedTags.length > 0} onClick={() => toggleMenu("labels")}>{labelText}</Chip>
+        <Chip icon={Folder} iconColor={selectedProject?.color ?? undefined} active={menu === "project"} selected={Boolean(projectId)} onClick={() => toggleMenu("project")}>{selectedProject?.name ?? "Inbox"}</Chip>
+        <Chip icon={TagIcon} iconColor={selectedTags[0]?.color ?? undefined} active={menu === "labels"} selected={selectedTags.length > 0} onClick={() => toggleMenu("labels")}>{labelText}</Chip>
         <Chip icon={MapPin} active={menu === "location"} selected={Boolean(location)} onClick={() => toggleMenu("location")}>{location || "Location"}</Chip>
         <Chip icon={MoreHorizontal} active={menu === "more"} selected={Boolean(description || deadlineDate)} onClick={() => toggleMenu("more")}>More</Chip>
-        <button type="submit" aria-label="Submit task" disabled={!parsed.input.title || createTask.isPending} className="ml-auto flex size-9 items-center justify-center rounded-lg bg-primary text-white shadow-sm transition hover:bg-primary/90 disabled:opacity-40"><ArrowUp className="size-5" /></button>
+        <button type="submit" aria-label={task ? "Save task" : "Submit task"} disabled={!parsed.input.title || isSaving} className="ml-auto flex size-9 items-center justify-center rounded-lg bg-primary text-white shadow-sm transition hover:bg-primary/90 disabled:opacity-40"><ArrowUp className="size-5" /></button>
       </div>
 
       {menu === "schedule" ? <Panel>
@@ -151,7 +161,7 @@ export function TaskComposer({ defaultProjectId = null, defaultDate = null, onCa
           <button type="button" onClick={() => setQuickDate("")} className="rounded-lg bg-surface-subtle px-3 py-2 text-left font-semibold text-muted">No date</button>
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          <label className="text-xs font-semibold text-muted">Date<input aria-label="Task date" type="date" value={taskDate} onChange={(event) => setManualDate(event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-stroke bg-surface px-2 text-sm text-ink" /></label>
+          <div className="text-xs font-semibold text-muted"><span>Date</span><DatePicker ariaLabel="Task date" value={taskDate} onChange={setManualDate} /></div>
           <label className="text-xs font-semibold text-muted">Start<input aria-label="Task start time" type="time" value={startTime} onChange={(event) => setManualStart(event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-stroke bg-surface px-2 text-sm text-ink" /></label>
           <label className="text-xs font-semibold text-muted">End<input aria-label="Task end time" type="time" value={endTime} onChange={(event) => setManualEnd(event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-stroke bg-surface px-2 text-sm text-ink" /></label>
         </div>
@@ -166,7 +176,7 @@ export function TaskComposer({ defaultProjectId = null, defaultDate = null, onCa
       </Panel> : null}
 
       {menu === "priority" ? <Panel><div className="space-y-1">
-        {(["urgent", "high", "medium", "low", "none"] as Priority[]).map((value) => <button key={value} type="button" onClick={() => { setManualPriority(value); setMenu(null); }} className={cn("flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-semibold capitalize hover:bg-surface-subtle", priority === value && "bg-surface-subtle")}><Flag className="size-4" style={{ color: priorityTone[value] }} />{value}<span className="ml-auto text-xs text-muted">^{value}</span></button>)}
+        {(["urgent", "high", "medium", "low", "none"] as Priority[]).map((value) => <button key={value} type="button" onClick={() => { setManualPriority(value); setMenu(null); }} className={cn("flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-semibold capitalize hover:bg-surface-subtle", priority === value && "bg-surface-subtle")}><Flag className="size-4" style={{ color: priorityTone[value] }} /><span style={{ color: priorityTone[value] }}>{value}</span><span className="ml-auto text-xs text-muted">^{value}</span></button>)}
       </div></Panel> : null}
 
       {menu === "reminders" ? <Panel><div className="space-y-2">
@@ -176,7 +186,7 @@ export function TaskComposer({ defaultProjectId = null, defaultDate = null, onCa
 
       {menu === "project" ? <Panel><div className="max-h-52 space-y-1 overflow-y-auto">
         <button type="button" onClick={() => { setManualProject(""); setMenu(null); }} className={cn("flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-surface-subtle", !projectId && "bg-surface-subtle font-semibold")}><Folder className="size-4 text-muted" />Inbox</button>
-        {projects?.map((project) => <button key={project.id} type="button" onClick={() => { setManualProject(project.id); setMenu(null); }} className={cn("flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-surface-subtle", projectId === project.id && "bg-surface-subtle font-semibold")}><span className="size-2.5 rounded-full" style={{ backgroundColor: project.color ?? "#dc4c3e" }} />{project.name}</button>)}
+        {projects?.map((project) => { const color = project.color ?? "#dc4c3e"; return <button key={project.id} type="button" onClick={() => { setManualProject(project.id); setMenu(null); }} className={cn("flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-surface-subtle", projectId === project.id && "bg-surface-subtle font-semibold")}><Folder className="size-4" style={{ color }} /><span className="truncate" style={{ color }}>{project.name}</span></button>; })}
       </div></Panel> : null}
 
       {menu === "labels" ? <Panel>
@@ -186,7 +196,7 @@ export function TaskComposer({ defaultProjectId = null, defaultDate = null, onCa
             const selected = tagIds.includes(tag.id);
             return <button key={tag.id} type="button" onClick={() => setManualTags(selected ? tagIds.filter((id) => id !== tag.id) : [...tagIds, tag.id])} className={cn("flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-surface-subtle", selected && "bg-surface-subtle font-semibold")}>
               <span className="size-3 rounded-sm" style={{ backgroundColor: tag.color ?? "#64748b" }} />
-              <span className="truncate">@{tag.name}</span>
+              <span className="truncate" style={{ color: tag.color ?? "#64748b" }}>{tag.name}</span>
               {selected ? <span className="ml-auto text-primary">✓</span> : null}
             </button>;
           })}
@@ -201,11 +211,8 @@ export function TaskComposer({ defaultProjectId = null, defaultDate = null, onCa
       </Panel> : null}
 
       {menu === "more" ? <Panel>
-        <label className="block text-xs font-semibold text-muted">Description
-          <textarea aria-label="Task description" value={description} onChange={(event) => setDescription(event.target.value)} rows={2} className="mt-1 w-full resize-y rounded-lg border border-stroke bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-primary/50" />
-        </label>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <label className="text-xs font-semibold text-muted">Deadline date<input aria-label="Deadline date" type="date" value={deadlineDate} onChange={(event) => setDeadlineDate(event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-stroke bg-surface px-2 text-sm text-ink" /></label>
+          <div className="text-xs font-semibold text-muted"><span>Deadline date</span><DatePicker ariaLabel="Deadline date" value={deadlineDate} onChange={setDeadlineDate} /></div>
           <label className="text-xs font-semibold text-muted">Deadline time<input aria-label="Deadline time" type="time" value={deadlineTime} onChange={(event) => setDeadlineTime(event.target.value)} disabled={!deadlineDate} className="mt-1 h-9 w-full rounded-lg border border-stroke bg-surface px-2 text-sm text-ink disabled:opacity-45" /></label>
         </div>
       </Panel> : null}

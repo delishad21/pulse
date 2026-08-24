@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PulseApiClient } from "@pulse/api-client";
+import { PulseApiClient, PulseApiError } from "@pulse/api-client";
 import { buildApp } from "../src/server.js";
 import { createMemoryRepository } from "../src/repositories/memory.js";
 import { clearRepository, setRepository } from "../src/repositories/registry.js";
@@ -298,6 +298,22 @@ test("task defaults to none priority and partial schedule patches preserve invar
     assert.equal(dateDeadline.due.date, "2099-04-04"); assert.equal(dateDeadline.due.at, null);
     const timedDeadline = await client.updateTask(task.id, { dueAt: "2099-04-04T17:00:00.000Z" });
     assert.equal(timedDeadline.due.date, null); assert.equal(timedDeadline.due.at, "2099-04-04T17:00:00.000Z");
+    const clearedWindow = await client.updateTask(task.id, { startAt: null });
+    assert.equal(clearedWindow.startAt, null); assert.equal(clearedWindow.endAt, null);
+
+    const second = await client.createTask({ title: "Second window", startAt: "2099-04-05T08:00:00.000Z", endAt: "2099-04-05T09:00:00.000Z" });
+    const [bulkCleared] = await client.bulkUpdate({ ids: [second.id], startAt: null });
+    assert.equal(bulkCleared?.startAt, null); assert.equal(bulkCleared?.endAt, null);
+  } finally { await cleanup(); }
+});
+
+test("invalid calendar dates, schedules and recurrence rules return validation errors", async () => {
+  const { client, cleanup } = await createTestClient();
+  const isValidationError = (error: unknown) => error instanceof PulseApiError && error.status === 400 && error.code === "VALIDATION_ERROR";
+  try {
+    await assert.rejects(() => client.createTask({ title: "Impossible date", dueDate: "2026-02-31" }), isValidationError);
+    await assert.rejects(() => client.createTask({ title: "End without start", endAt: "2099-04-05T09:00:00.000Z" }), isValidationError);
+    await assert.rejects(() => client.createTask({ title: "Invalid recurrence", recurrenceRule: "FREQ=HOURLY" }), isValidationError);
   } finally { await cleanup(); }
 });
 

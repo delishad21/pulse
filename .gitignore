@@ -22,6 +22,7 @@
 
 # production
 /build
+**/build/
 
 # misc
 .DS_Store
@@ -50,6 +51,9 @@ next-env.d.ts
 **/dist/
 **/coverage/
 packages/db/src/generated/prisma/
+
+# Local agent worktrees are not application source.
+.worktrees/
 
 # native generated projects (Expo CNG)
 apps/mobile/ios/

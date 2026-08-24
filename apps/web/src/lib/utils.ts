@@ -12,12 +12,16 @@ export function formatDate(dateString: string | null): string {
   });
 }
 
-export function isToday(dateString: string | null): boolean {
-  if (!dateString) return false;
-  return dateString === new Date().toISOString().slice(0, 10);
+function localDateKey(now: Date): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
-export function isOverdue(dateString: string | null): boolean {
+export function isToday(dateString: string | null, now = new Date()): boolean {
   if (!dateString) return false;
-  return dateString < new Date().toISOString().slice(0, 10);
+  return dateString === localDateKey(now);
+}
+
+export function isOverdue(dateString: string | null, now = new Date()): boolean {
+  if (!dateString) return false;
+  return dateString < localDateKey(now);
 }

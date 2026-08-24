@@ -1,16 +1,20 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Redirect } from "expo-router";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { useAuth } from "@/providers/auth-provider";
+import { useAppTheme } from "@/providers/theme-provider";
 
 export default function HomeScreen() {
+  const { status } = useAuth();
+  const { palette } = useAppTheme();
+  if (status === "authenticated") return <Redirect href="/today" />;
+  if (status === "unauthenticated") return <Redirect href="/login" />;
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Pulse</Text>
-      <Text style={styles.subtitle}>Your tasks, everywhere.</Text>
+      <ActivityIndicator color={palette.accent} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  title: { fontSize: 36, fontWeight: '700' },
-  subtitle: { marginTop: 8, fontSize: 16, opacity: 0.65 },
+  container: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
 });

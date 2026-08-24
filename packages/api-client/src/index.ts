@@ -15,6 +15,10 @@ export interface PulseApiClientOptions {
   getAccessToken?: () => Promise<string | null>;
 }
 
+export interface MobileUser { id: string; name: string; username: string; }
+export interface MobileSession { accessToken: string; expiresAt: string; user: MobileUser; }
+export interface MobileAuthConfig { authDisabled: boolean; registrationEnabled: boolean; }
+
 export interface TaskReminderInput { remindAt: string; channel?: string; }
 
 export interface CreateTaskInput {
@@ -96,11 +100,16 @@ export class PulseApiClient {
     });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
-      throw new PulseApiError(response.status, data.error?.code ?? "UNKNOWN_ERROR", data.error?.message ?? `Pulse API error: ${response.status}`, data.error?.details);
+      const error = typeof data.error === "string" ? { message: data.error } : data.error;
+      throw new PulseApiError(response.status, error?.code ?? "UNKNOWN_ERROR", error?.message ?? `Pulse API error: ${response.status}`, error?.details);
     }
     if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
   }
+
+  getMobileAuthConfig(): Promise<MobileAuthConfig> { return this.request("GET", "/api/mobile-auth/config"); }
+  loginMobile(input: { username: string; password: string }): Promise<MobileSession> { return this.request("POST", "/api/mobile-auth/login", input); }
+  getMobileSession(): Promise<{ user: MobileUser }> { return this.request("GET", "/api/mobile-auth/me"); }
 
   listTasks(params?: Record<string, string>): Promise<Task[]> {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : "";
