@@ -87,7 +87,7 @@ jobs:
 
       - name: Docker metadata (API)
         id: api-meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: docker.io/${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}/pulse-api
           tags: |
@@ -97,7 +97,7 @@ jobs:
 
       - name: Docker metadata (web)
         id: web-meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: docker.io/${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}/pulse-web
           tags: |
