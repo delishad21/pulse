@@ -106,7 +106,7 @@ jobs:
             type=ref,event=tag
 
       - name: Build and push API image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: api
@@ -117,7 +117,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=pulse-api
 
       - name: Build and push web image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: web
