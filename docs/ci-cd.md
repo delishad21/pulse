@@ -30,12 +30,16 @@ keytool -genkeypair -v -storetype PKCS12 \
   -keystore pulse-release.keystore \
   -alias pulse \
   -keyalg RSA -keysize 2048 -validity 10000
-base64 -i pulse-release.keystore | pbcopy
+# macOS (copies one continuous line to the clipboard)
+base64 -i pulse-release.keystore | tr -d '\n' | pbcopy
+# Linux (writes one continuous line to a file you can copy)
+base64 -w 0 pulse-release.keystore > pulse-release.keystore.b64
 ```
 
-Paste the copied value into `ANDROID_KEYSTORE_BASE64`, then add the three
-password/alias values as separate secrets. Keep the keystore outside the
-repository. Android only accepts an update when it is signed by the same key;
+Paste only the Base64 text into `ANDROID_KEYSTORE_BASE64` (no quotes or code
+fences), then add the three password/alias values as separate secrets. Wrapped
+lines are accepted by CI, but a value containing other characters will fail
+validation. Keep the keystore outside the repository. Android only accepts an update when it is signed by the same key;
 the first CI-signed APK therefore replaces any earlier locally debug-signed
 APK (uninstall the debug build once if Android refuses the update).
 
