@@ -36,6 +36,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Prisma client
+        env:
+          DATABASE_URL: postgresql://pulse:ci-only@localhost:5432/pulse
+        run: npm run db:generate
+
       - name: Typecheck
         run: npm run typecheck
 
