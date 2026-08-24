@@ -226,7 +226,7 @@ jobs:
           test -n "$DEPLOY_SSH_KEY" || { echo "Missing DEPLOY_SSH_KEY repository secret"; exit 1; }
 
       - name: Load deployment SSH key
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
 
