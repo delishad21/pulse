@@ -286,7 +286,7 @@ jobs:
       contents: write
     steps:
       - name: Download APK artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: pulse-android-${{ github.sha }}
           path: dist
