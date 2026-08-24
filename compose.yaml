@@ -61,7 +61,8 @@ services:
       PULSE_API_INTERNAL_URL: http://api:4000
       PULSE_WEB_TOKEN: ${PULSE_WEB_TOKEN}
       AUTH_SECRET: ${AUTH_SECRET}
-      AUTH_URL: ${AUTH_URL:-https://pulse.delishad.com}
+      # Set AUTH_URL in the deployment environment to the public Pulse URL.
+      AUTH_URL: ${AUTH_URL:-https://pulse.example.com}
       PULSE_REGISTRATION_ENABLED: ${PULSE_REGISTRATION_ENABLED:-false}
       PULSE_AUTH_DISABLED: ${PULSE_AUTH_DISABLED:-false}
       NEXT_TELEMETRY_DISABLED: 1

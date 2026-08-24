@@ -59,6 +59,7 @@ jobs:
           PULSE_WEB_TOKEN: ci-only-web-token
           PULSE_SERVICE_TOKEN: ci-only-service-token
           AUTH_SECRET: ci-only-auth-secret
+          AUTH_URL: https://pulse.example.com
         run: docker compose -f compose.yaml config --quiet
 
   publish-images:
