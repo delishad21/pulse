@@ -57,7 +57,7 @@ only in a production/release environment.
 ## CI/CD and releases
 
 The workflow in [`docs/ci-cd.md`](docs/ci-cd.md) runs checks, publishes Docker
-Hub images, deploys immutable image tags to the home server, and attaches a
-signed Android APK to versioned GitHub Releases. Keep all credentials in
-GitHub Actions secrets or the server `.env`; never commit local `.env` files or
+Hub images, and attaches a signed Android APK to versioned GitHub Releases.
+Pull `:latest` manually on the home server when you want to update it. Keep all
+credentials in GitHub Actions secrets or the server `.env`; never commit local `.env` files or
 signing keys.

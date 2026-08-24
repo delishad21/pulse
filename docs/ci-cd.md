@@ -1,10 +1,9 @@
 # Pulse CI/CD
 
 The `Pulse CI/CD` workflow in `.github/workflows/ci.yml` runs the monorepo
-checks, publishes the API and web images to Docker Hub, builds a signed Android
-APK, and deploys the immutable image tags to the home server on pushes to
-`main`. A tag such as `v1.0.1` also creates a GitHub Release with the APK
-attached.
+checks, publishes the API and web images to Docker Hub, and builds a signed
+Android APK. A tag such as `v1.0.1` also creates a GitHub Release with the APK
+attached. The home server is updated manually by pulling the `latest` images.
 
 ## GitHub configuration
 
@@ -17,10 +16,6 @@ Actions**:
   repositories.
 - `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
   and `ANDROID_KEY_PASSWORD`: the signing key used for every downloadable APK.
-- `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`, `DEPLOY_SSH_KEY`, and
-  `DEPLOY_KNOWN_HOSTS`: the SSH connection to the home server. `DEPLOY_PATH`
-  should be the directory containing the production `.env` and compose file,
-  for example `/home/delishad21/services/pulse`.
 
 The optional repository variable `DOCKERHUB_NAMESPACE` can be set when the
 Docker Hub namespace differs from the login username. The optional
@@ -44,13 +39,27 @@ repository. Android only accepts an update when it is signed by the same key;
 the first CI-signed APK therefore replaces any earlier locally debug-signed
 APK (uninstall the debug build once if Android refuses the update).
 
-## Home-server deployment
+## Home-server updates
 
 The production `compose.yaml` accepts complete image references through
-`PULSE_API_IMAGE` and `PULSE_WEB_IMAGE`. The deploy job updates only those two
-keys in the server `.env`, copies the compose file atomically, pulls the
-immutable commit-tagged images, and recreates only `api` and `web`. Database
-volumes and the existing authentication settings are left untouched.
+`PULSE_API_IMAGE` and `PULSE_WEB_IMAGE`. Set these two values in the home
+server's `.env` to the Docker Hub `latest` tags, for example:
+
+```dotenv
+PULSE_API_IMAGE=docker.io/<dockerhub-namespace>/pulse-api:latest
+PULSE_WEB_IMAGE=docker.io/<dockerhub-namespace>/pulse-web:latest
+```
+
+After a successful `main` build, update the server manually:
+
+```sh
+cd /home/delishad21/services/pulse
+docker compose pull api web
+docker compose up -d --no-build api web
+```
+
+Only the application services are recreated; database volumes and existing
+authentication settings remain untouched.
 
 The Docker Hub repositories may be public, in which case the server needs no
 additional setup. For private repositories, log in on the server once with a
