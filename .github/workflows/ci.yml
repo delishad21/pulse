@@ -180,7 +180,14 @@ jobs:
           test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo "Missing ANDROID_KEYSTORE_PASSWORD repository secret"; exit 1; }
           test -n "$ANDROID_KEY_ALIAS" || { echo "Missing ANDROID_KEY_ALIAS repository secret"; exit 1; }
           test -n "$ANDROID_KEY_PASSWORD" || { echo "Missing ANDROID_KEY_PASSWORD repository secret"; exit 1; }
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/pulse-release.keystore"
+          # GitHub preserves newlines copied from macOS/Linux base64 output.
+          # Remove only whitespace before decoding so wrapped Base64 remains valid.
+          keystore_base64="$(printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '[:space:]')"
+          if ! printf '%s' "$keystore_base64" | base64 --decode > "$RUNNER_TEMP/pulse-release.keystore"; then
+            echo "ANDROID_KEYSTORE_BASE64 is not valid Base64; replace the secret with the raw Base64 output (without quotes)."
+            exit 1
+          fi
+          test -s "$RUNNER_TEMP/pulse-release.keystore" || { echo "Decoded Android keystore is empty"; exit 1; }
 
       - name: Assemble production APK
         working-directory: apps/mobile/android
