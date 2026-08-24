@@ -1,5 +1,35 @@
-import { Stack } from 'expo-router';
+import { Stack } from "expo-router";
+import { useFonts } from "expo-font";
+import { StatusBar } from "expo-status-bar";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AuthProvider } from "@/providers/auth-provider";
+import { QueryProvider } from "@/providers/query-provider";
+import { ThemeProvider, useAppTheme } from "@/providers/theme-provider";
 
 export default function RootLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  const [fontsLoaded] = useFonts({
+    ProductSans: require("../../assets/fonts/ProductSans-Regular.ttf"),
+    ProductSansBold: require("../../assets/fonts/ProductSans-Bold.ttf"),
+    ProductSansItalic: require("../../assets/fonts/ProductSans-Italic.ttf"),
+  });
+
+  if (!fontsLoaded) return null;
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <QueryProvider>
+            <AuthProvider><RootNavigator /></AuthProvider>
+          </QueryProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}
+
+function RootNavigator() {
+  const { isDark, palette } = useAppTheme();
+  return <><StatusBar style={isDark ? "light" : "dark"} /><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.background }, animation: "fade" }} /></>;
 }

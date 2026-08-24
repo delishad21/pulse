@@ -1,0 +1,299 @@
+name: Pulse CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pulse-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22.13.0"
+
+jobs:
+  checks:
+    name: Typecheck, lint, and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build packages
+        run: npm run build
+
+      - name: Validate production compose
+        env:
+          PULSE_DB_PASSWORD: ci-only-password
+          PULSE_WEB_TOKEN: ci-only-web-token
+          PULSE_SERVICE_TOKEN: ci-only-service-token
+          AUTH_SECRET: ci-only-auth-secret
+        run: docker compose -f compose.yaml config --quiet
+
+  publish-images:
+    name: Publish Docker images
+    needs: checks
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Hub credentials
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          test -n "$DOCKERHUB_USERNAME" || { echo "Missing DOCKERHUB_USERNAME repository secret"; exit 1; }
+          test -n "$DOCKERHUB_TOKEN" || { echo "Missing DOCKERHUB_TOKEN repository secret"; exit 1; }
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker metadata (API)
+        id: api-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: docker.io/${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}/pulse-api
+          tags: |
+            type=sha,prefix=,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
+
+      - name: Docker metadata (web)
+        id: web-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: docker.io/${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}/pulse-web
+          tags: |
+            type=sha,prefix=,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: api
+          push: true
+          tags: ${{ steps.api-meta.outputs.tags }}
+          labels: ${{ steps.api-meta.outputs.labels }}
+          cache-from: type=gha,scope=pulse-api
+          cache-to: type=gha,mode=max,scope=pulse-api
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: web
+          push: true
+          tags: ${{ steps.web-meta.outputs.tags }}
+          labels: ${{ steps.web-meta.outputs.labels }}
+          cache-from: type=gha,scope=pulse-web
+          cache-to: type=gha,mode=max,scope=pulse-web
+
+  android-apk:
+    name: Build signed Android APK
+    needs: checks
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.1.12297006"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Android project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Validate Android signing configuration
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "Missing ANDROID_KEYSTORE_BASE64 repository secret"; exit 1; }
+          test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo "Missing ANDROID_KEYSTORE_PASSWORD repository secret"; exit 1; }
+          test -n "$ANDROID_KEY_ALIAS" || { echo "Missing ANDROID_KEY_ALIAS repository secret"; exit 1; }
+          test -n "$ANDROID_KEY_PASSWORD" || { echo "Missing ANDROID_KEY_PASSWORD repository secret"; exit 1; }
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/pulse-release.keystore"
+
+      - name: Assemble production APK
+        working-directory: apps/mobile/android
+        env:
+          EXPO_PUBLIC_PULSE_API_URL: ${{ vars.PULSE_PRODUCTION_API_URL || 'https://pulse.delishad.com' }}
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/pulse-release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Prepare APK artifact
+        run: cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "pulse-android-${GITHUB_SHA}.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pulse-android-${{ github.sha }}
+          path: pulse-android-${{ github.sha }}.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  deploy-home-server:
+    name: Deploy Docker images to home server
+    needs: [publish-images, android-apk]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate deployment connection settings
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          test -n "$DEPLOY_HOST" || { echo "Missing DEPLOY_HOST repository secret"; exit 1; }
+          test -n "$DEPLOY_USER" || { echo "Missing DEPLOY_USER repository secret"; exit 1; }
+          test -n "$DEPLOY_PATH" || { echo "Missing DEPLOY_PATH repository secret"; exit 1; }
+          test -n "$DEPLOY_KNOWN_HOSTS" || { echo "Missing DEPLOY_KNOWN_HOSTS repository secret"; exit 1; }
+          test -n "$DEPLOY_SSH_KEY" || { echo "Missing DEPLOY_SSH_KEY repository secret"; exit 1; }
+
+      - name: Load deployment SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Configure SSH host verification
+        env:
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Upload production compose file
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: scp compose.yaml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/compose.yaml.ci"
+
+      - name: Pull and restart application services
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          API_IMAGE: docker.io/${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}/pulse-api:${{ github.sha }}
+          WEB_IMAGE: docker.io/${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}/pulse-web:${{ github.sha }}
+        run: |
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" \
+            "PULSE_DEPLOY_PATH='$DEPLOY_PATH' API_IMAGE='$API_IMAGE' WEB_IMAGE='$WEB_IMAGE' sh -s" <<'REMOTE'
+          set -eu
+          cd "$PULSE_DEPLOY_PATH"
+          test -f .env
+          mv compose.yaml.ci compose.yaml
+
+          set_env() {
+            key="$1"
+            value="$2"
+            if grep -q "^${key}=" .env; then
+              sed -i "s#^${key}=.*#${key}=${value}#" .env
+            else
+              printf '\n%s=%s\n' "$key" "$value" >> .env
+            fi
+          }
+
+          set_env PULSE_API_IMAGE "$API_IMAGE"
+          set_env PULSE_WEB_IMAGE "$WEB_IMAGE"
+          docker compose pull api web
+          docker compose up -d --no-build api web
+          docker compose ps
+          REMOTE
+
+  github-release:
+    name: Publish APK GitHub release
+    needs: android-apk
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pulse-android-${{ github.sha }}
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: dist/*.apk

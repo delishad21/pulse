@@ -3,36 +3,103 @@
     "name": "Pulse",
     "slug": "pulse",
     "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "orientation": "default",
+    "icon": "./assets/images/pulse-app-icon.png",
     "scheme": "pulse",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/pulse-app-icon.png",
+      "bundleIdentifier": "com.pulse.tasks",
+      "supportsTablet": true
     },
     "android": {
+      "package": "com.pulse.tasks",
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#ffffff",
+        "foregroundImage": "./assets/images/pulse-adaptive-foreground.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/pulse-app-icon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
+          "backgroundColor": "#ffffff",
+          "image": "./assets/images/pulse-app-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      [
+        "expo-widgets",
+        {
+          "enableAndroid": false,
+          "widgets": [
+            {
+              "name": "PulseToday",
+              "displayName": "Pulse Today",
+              "description": "Your open tasks for today.",
+              "ios": { "supportedFamilies": ["systemSmall", "systemMedium", "systemLarge"] },
+              "android": { "targetCellWidth": 3, "targetCellHeight": 3, "resizeMode": "both" }
+            },
+            {
+              "name": "PulseInbox",
+              "displayName": "Pulse Inbox",
+              "description": "Unscheduled tasks in your inbox.",
+              "ios": { "supportedFamilies": ["systemSmall", "systemMedium", "systemLarge"] },
+              "android": { "targetCellWidth": 3, "targetCellHeight": 3, "resizeMode": "both" }
+            },
+            {
+              "name": "PulseUpcoming",
+              "displayName": "Pulse Upcoming",
+              "description": "Your next scheduled tasks.",
+              "ios": { "supportedFamilies": ["systemMedium", "systemLarge", "systemExtraLarge"] },
+              "android": { "targetCellWidth": 4, "targetCellHeight": 3, "resizeMode": "both" }
+            },
+            {
+              "name": "PulseOverdue",
+              "displayName": "Pulse Overdue",
+              "description": "Tasks that need your attention.",
+              "ios": { "supportedFamilies": ["systemSmall", "systemMedium"] },
+              "android": { "targetCellWidth": 3, "targetCellHeight": 2, "resizeMode": "both" }
+            },
+            {
+              "name": "PulseTasks",
+              "displayName": "Pulse Tasks",
+              "description": "A customizable task list.",
+              "ios": {
+                "supportedFamilies": ["systemSmall", "systemMedium", "systemLarge", "systemExtraLarge"],
+                "configuration": {
+                  "title": "Task list",
+                  "description": "Choose the task view and amount of detail.",
+                  "parameters": {
+                    "view": {
+                      "title": "View",
+                      "type": "enum",
+                      "values": [
+                        { "name": "Today", "value": "today" },
+                        { "name": "Inbox", "value": "inbox" },
+                        { "name": "Upcoming", "value": "upcoming" },
+                        { "name": "Overdue", "value": "overdue" }
+                      ],
+                      "default": "today"
+                    },
+                    "showDue": { "title": "Show dates", "type": "boolean", "default": true },
+                    "showProject": { "title": "Show projects", "type": "boolean", "default": true }
+                  }
+                }
+              },
+              "android": { "targetCellWidth": 4, "targetCellHeight": 4, "resizeMode": "both" }
+            }
+          ]
+        }
+      ],
+      "./plugins/with-android-release-signing"
     ],
     "experiments": {
       "typedRoutes": true,

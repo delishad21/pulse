@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PULSE_DEPLOY_DIR="${PULSE_DEPLOY_DIR:-$HOME/services/pulse}"
+cd "$PULSE_DEPLOY_DIR"
+
+# MCP uses stdout for protocol traffic. Compose/Docker diagnostics stay on stderr.
+exec docker compose --profile mcp run --rm -T --no-deps mcp

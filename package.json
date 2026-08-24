@@ -2,15 +2,35 @@
   "name": "pulse",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["apps/*", "packages/*"],
-  "engines": { "node": ">=22.13.0" },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
+    "postinstall": "patch-package",
+    "dev:api": "npm run dev -w @pulse/api",
     "dev:web": "npm run dev -w @pulse/web",
     "dev:mobile": "npm run start -w @pulse/mobile",
+    "dev:mcp": "npm run dev -w @pulse/mcp",
+    "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "db:generate": "npm run db:generate -w @pulse/db",
-    "db:migrate": "npm run db:migrate -w @pulse/db"
+    "db:migrate": "npm run db:migrate -w @pulse/db",
+    "db:deploy": "npm run db:deploy -w @pulse/db"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "fastify": "^5.12.1",
+    "expo": "~57.0.15",
+    "react": "19.2.3",
+    "react-native": "0.86.2"
+  },
+  "devDependencies": {
+    "patch-package": "^8.0.1"
   }
 }

@@ -1,0 +1,90 @@
+name: pulse-dev
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: pulse
+      POSTGRES_USER: pulse
+      POSTGRES_PASSWORD: pulse-dev-only
+    volumes:
+      - pulse_dev_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulse -d pulse"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks: [internal]
+
+  api:
+    build:
+      context: .
+      target: base
+    command: >-
+      sh -c "npm run db:generate && npm run db:deploy &&
+      exec npm run dev -w @pulse/api"
+    environment:
+      DATABASE_URL: postgresql://pulse:pulse-dev-only@db:5432/pulse
+      PORT: 4000
+      PULSE_DEFAULT_USERNAME: dev-user
+      PULSE_DEFAULT_USER_NAME: Development User
+      PULSE_DEFAULT_TIMEZONE: Asia/Singapore
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - .:/app
+      - pulse_dev_node_modules:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:4000/api/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [internal]
+
+  web:
+    build:
+      context: .
+      target: base
+    command: >-
+      npm run dev -w @pulse/web -- --hostname 0.0.0.0 --port 3000
+    environment:
+      DATABASE_URL: postgresql://pulse:pulse-dev-only@db:5432/pulse
+      PULSE_API_INTERNAL_URL: http://api:4000
+      PULSE_AUTH_DISABLED: "true"
+      PULSE_REGISTRATION_ENABLED: "false"
+      AUTH_SECRET: pulse-development-secret-not-for-production
+      NEXT_TELEMETRY_DISABLED: 1
+      WATCHPACK_POLLING: "true"
+      PULSE_DEV_ALLOWED_ORIGINS: ${PULSE_DEV_ALLOWED_ORIGINS:-192.168.1.130,100.80.199.58}
+    volumes:
+      - .:/app
+      - pulse_dev_node_modules:/app/node_modules
+      - pulse_dev_next:/app/apps/web/.next
+    ports:
+      - "0.0.0.0:${PULSE_DEV_WEB_PORT:-3010}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [internal, edge]
+
+networks:
+  internal:
+    name: pulse_dev_internal
+    internal: true
+  edge:
+    name: pulse_dev_edge
+    driver: bridge
+
+volumes:
+  pulse_dev_postgres:
+    name: pulse_dev_postgres
+  pulse_dev_node_modules:
+    name: pulse_dev_node_modules
+  pulse_dev_next:
+    name: pulse_dev_next

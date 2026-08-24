@@ -4,7 +4,17 @@
   "private": true,
   "type": "module",
   "exports": "./src/index.ts",
-  "dependencies": { "@pulse/domain": "*" },
-  "scripts": { "typecheck": "tsc --noEmit" },
-  "devDependencies": { "typescript": "^6.0.3" }
+  "dependencies": {
+    "@pulse/domain": "*",
+    "dotenv": "^16.6.1",
+    "fastify": "^5.12.1"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test src/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^6.0.3"
+  }
 }

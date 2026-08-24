@@ -1,29 +1,27 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { Providers } from "@/components/providers";
+import { ThemeScript } from "@/components/theme-script";
 
 export const metadata: Metadata = {
   title: "Pulse",
   description: "Your tasks, everywhere.",
+  icons: { icon: "/pulse-waveform-logo.png", apple: "/pulse-waveform-logo.png" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className="h-full antialiased"
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <head>
+        <ThemeScript />
+      </head>
+      <body className="min-h-full bg-canvas text-ink">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
