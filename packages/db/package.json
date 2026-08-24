@@ -14,7 +14,7 @@
     "db:deploy": "prisma migrate deploy"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/node": "^26",
     "dotenv": "^16.6.1",
     "prisma": "^7.9.1",
     "typescript": "^6.0.3"
