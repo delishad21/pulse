@@ -2,13 +2,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { PulseApiClient, PulseApiError, type MobileUser } from "@pulse/api-client";
-import { createContext, useContext, useEffect, useState, type PropsWithChildren } from "react";
-import { pulseApiOrigin } from "@/lib/api-origin";
+import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
+import { environmentApiOrigin, normalizeApiOrigin, queryCacheKey } from "@/lib/api-origin";
 
 const TOKEN_KEY = "pulse.mobile.session";
+const SERVER_ORIGIN_KEY = "pulse.mobile.server-origin";
+const WIDGET_BASELINES_KEY = "pulse.widget-baselines-v2";
+const PENDING_WIDGET_ACTIONS_KEY = "pulse.pending-widget-completions-v1";
 let mobileAccessToken: string | null = null;
-const mobileApi = new PulseApiClient({ baseUrl: pulseApiOrigin, getAccessToken: async () => mobileAccessToken });
-type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+type AuthStatus = "loading" | "needs-server" | "authenticated" | "unauthenticated";
 
 interface StoredSession { accessToken: string; expiresAt: string; user: MobileUser; }
 interface AuthContextValue {
@@ -16,7 +18,10 @@ interface AuthContextValue {
   status: AuthStatus;
   user: MobileUser | null;
   registrationEnabled: boolean;
-  apiOrigin: string;
+  apiOrigin: string | null;
+  suggestedApiOrigin: string | null;
+  connectServer: (origin: string) => Promise<void>;
+  disconnectServer: () => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
   register: (name: string, username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -35,11 +40,26 @@ async function setStoredSession(value: string | null): Promise<void> {
   else await SecureStore.deleteItemAsync(TOKEN_KEY);
 }
 
+async function clearServerSession(origin: string | null): Promise<void> {
+  mobileAccessToken = null;
+  await setStoredSession(null);
+  await AsyncStorage.multiRemove([
+    "pulse.query-cache",
+    origin ? queryCacheKey(origin) : "",
+    WIDGET_BASELINES_KEY,
+    PENDING_WIDGET_ACTIONS_KEY,
+  ].filter(Boolean));
+}
+
 export function AuthProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<MobileUser | null>(null);
   const [registrationEnabled, setRegistrationEnabled] = useState(false);
-  const api = mobileApi;
+  const [serverOrigin, setServerOrigin] = useState<string | null>(null);
+  const api = useMemo(() => new PulseApiClient({
+    baseUrl: serverOrigin ?? environmentApiOrigin ?? "http://127.0.0.1:3010",
+    getAccessToken: async () => mobileAccessToken,
+  }), [serverOrigin]);
 
   const establish = async (session: StoredSession) => {
     mobileAccessToken = session.accessToken;
@@ -49,6 +69,21 @@ export function AuthProvider({ children }: PropsWithChildren) {
   };
 
   useEffect(() => {
+    let alive = true;
+    AsyncStorage.getItem(SERVER_ORIGIN_KEY).then((raw) => {
+      if (!alive) return;
+      let origin: string | null = null;
+      if (raw) {
+        try { origin = normalizeApiOrigin(raw); } catch { /* A malformed saved value is treated as unconfigured. */ }
+      }
+      if (origin) setServerOrigin(origin);
+      else { setUser(null); setStatus("needs-server"); }
+    }).catch(() => { if (alive) setStatus("needs-server"); });
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!serverOrigin) return;
     let alive = true;
     (async () => {
       try {
@@ -76,14 +111,37 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
     })();
     return () => { alive = false; };
-  }, [api]);
+  }, [api, serverOrigin]);
+
+  const connectServer = async (input: string) => {
+    const origin = normalizeApiOrigin(input);
+    const candidate = new PulseApiClient({ baseUrl: origin, getAccessToken: async () => null });
+    const config = await candidate.getMobileAuthConfig();
+    await clearServerSession(serverOrigin);
+    await AsyncStorage.setItem(SERVER_ORIGIN_KEY, origin);
+    setUser(null);
+    setRegistrationEnabled(config.registrationEnabled);
+    setServerOrigin(origin);
+    setStatus("loading");
+  };
+
+  const disconnectServer = async () => {
+    await clearServerSession(serverOrigin);
+    await AsyncStorage.removeItem(SERVER_ORIGIN_KEY);
+    setServerOrigin(null);
+    setRegistrationEnabled(false);
+    setUser(null);
+    setStatus("needs-server");
+  };
 
   const login = async (username: string, password: string) => {
+    if (!serverOrigin) throw new Error("Choose a Pulse server first.");
     await establish(await api.loginMobile({ username, password }));
   };
 
   const register = async (name: string, username: string, password: string) => {
-    const response = await fetch(`${pulseApiOrigin}/api/register`, {
+    if (!serverOrigin) throw new Error("Choose a Pulse server first.");
+    const response = await fetch(`${serverOrigin}/api/register`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, username, password }),
     });
     if (!response.ok) {
@@ -100,7 +158,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     await setStoredSession(null);
   };
 
-  const value = { api, status, user, registrationEnabled, apiOrigin: pulseApiOrigin, login, register, logout };
+  const value = { api, status, user, registrationEnabled, apiOrigin: serverOrigin, suggestedApiOrigin: environmentApiOrigin, connectServer, disconnectServer, login, register, logout };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

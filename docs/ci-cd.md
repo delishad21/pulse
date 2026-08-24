@@ -19,9 +19,11 @@ Actions**:
 
 The optional repository variable `DOCKERHUB_NAMESPACE` can be set when the
 Docker Hub namespace differs from the login username. The optional
-`PULSE_PRODUCTION_API_URL` variable defaults to `https://pulse.delishad.com`.
-The API URL is embedded in the mobile bundle and is not a credential; all
-credentials remain GitHub secrets or server-side environment variables.
+mobile development variable `EXPO_PUBLIC_PULSE_API_URL` can prefill the server
+selector while running locally. Production APKs intentionally do not embed a
+server URL: on first launch, the user chooses a Pulse instance and can change
+or disconnect it from the login screen. All credentials remain GitHub secrets
+or server-side environment variables.
 
 For a new Android signing key, generate it locally and never commit it:
 
