@@ -7,6 +7,7 @@ export default function HomeScreen() {
   const { status } = useAuth();
   const { palette } = useAppTheme();
   if (status === "authenticated") return <Redirect href="/today" />;
+  if (status === "needs-server") return <Redirect href="/server" />;
   if (status === "unauthenticated") return <Redirect href="/login" />;
   return (
     <View style={styles.container}>

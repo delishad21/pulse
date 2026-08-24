@@ -11,6 +11,7 @@ export default function WidgetDeepLinkScreen() {
   const segments = useMemo(() => Array.isArray(params.path) ? params.path : params.path ? params.path.split("/") : [], [params.path]);
 
   useEffect(() => {
+    if (status === "needs-server") { router.replace("/server"); return; }
     if (status === "unauthenticated") { router.replace("/login"); return; }
     if (status !== "authenticated" || !segments.length) return;
     const action = segments[0];

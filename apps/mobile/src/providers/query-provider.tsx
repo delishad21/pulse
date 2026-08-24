@@ -3,12 +3,11 @@ import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persi
 import { QueryClient, focusManager, onlineManager } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import * as Network from "expo-network";
-import { useEffect, useState, type PropsWithChildren } from "react";
+import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { AppState, Platform } from "react-native";
 
-const persister = createAsyncStoragePersister({ storage: AsyncStorage, key: "pulse.query-cache", throttleTime: 1000 });
-
-export function QueryProvider({ children }: PropsWithChildren) {
+export function QueryProvider({ children, storageKey = "pulse.query-cache" }: PropsWithChildren<{ storageKey?: string }>) {
+  const persister = useMemo(() => createAsyncStoragePersister({ storage: AsyncStorage, key: storageKey, throttleTime: 1000 }), [storageKey]);
   const [client] = useState(() => new QueryClient({
     defaultOptions: {
       queries: { staleTime: 30_000, gcTime: 24 * 60 * 60 * 1000, retry: 2, refetchOnReconnect: true },
@@ -28,7 +27,7 @@ export function QueryProvider({ children }: PropsWithChildren) {
   }, []);
 
   return (
-    <PersistQueryClientProvider client={client} persistOptions={{ persister, maxAge: 24 * 60 * 60 * 1000, buster: "pulse-mobile-v1" }}>
+    <PersistQueryClientProvider client={client} persistOptions={{ persister, maxAge: 24 * 60 * 60 * 1000, buster: "pulse-mobile-v2" }}>
       {children}
     </PersistQueryClientProvider>
   );

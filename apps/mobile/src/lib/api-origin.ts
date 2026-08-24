@@ -23,4 +23,29 @@ function platformOrigin(origin: string): string {
   return normalized;
 }
 
-export const pulseApiOrigin = platformOrigin(process.env.EXPO_PUBLIC_PULSE_API_URL || developmentOrigin());
+/**
+ * An optional development-time hint. Production builds intentionally leave
+ * this unset so the server connection screen can target any Pulse instance.
+ */
+export const environmentApiOrigin = process.env.EXPO_PUBLIC_PULSE_API_URL
+  ? platformOrigin(process.env.EXPO_PUBLIC_PULSE_API_URL)
+  : (__DEV__ ? developmentOrigin() : null);
+
+export function normalizeApiOrigin(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) throw new Error("Enter a server URL.");
+  let parsed: URL;
+  try { parsed = new URL(trimmed); } catch { throw new Error("Enter a complete URL, including http:// or https://."); }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("The server URL must use http:// or https://.");
+  }
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new Error("Enter only the server address, without credentials or query parameters.");
+  }
+  return parsed.toString().replace(/\/$/, "");
+}
+
+/** Keep persisted query caches isolated when a user switches servers. */
+export function queryCacheKey(apiOrigin: string | null): string {
+  return `pulse.query-cache:${encodeURIComponent(apiOrigin ?? "unconfigured")}`;
+}

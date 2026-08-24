@@ -1,4 +1,4 @@
-import { Redirect } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
 import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
 import { PulseApiError } from "@pulse/api-client";
@@ -9,6 +9,7 @@ import { useAppTheme } from "@/providers/theme-provider";
 
 export default function LoginScreen() {
   const auth = useAuth();
+  const router = useRouter();
   const { palette } = useAppTheme();
   const { width } = useWindowDimensions();
   const [registering, setRegistering] = useState(false);
@@ -19,6 +20,7 @@ export default function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
 
   if (auth.status === "authenticated") return <Redirect href="/today" />;
+  if (auth.status === "needs-server") return <Redirect href="/server" />;
   const submit = async () => {
     setLoading(true); setError(null);
     try {
@@ -48,6 +50,9 @@ export default function LoginScreen() {
               <AppText muted>{registering ? "Already have an account? " : "New to Pulse? "}<AppText style={{ color: palette.accent, fontWeight: "700" }}>{registering ? "Sign in" : "Create account"}</AppText></AppText>
             </Pressable>}
             <AppText muted style={styles.server}>Server: {auth.apiOrigin}</AppText>
+            <Pressable onPress={async () => { await auth.disconnectServer(); router.replace("/server"); }} style={styles.changeServer}>
+              <AppText style={{ color: palette.accent, fontWeight: "700" }}>Change or disconnect server</AppText>
+            </Pressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -61,5 +66,5 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 16, marginTop: 5 }, form: { marginTop: 34, gap: 13 },
   input: { fontFamily: AppFont, height: 52, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, fontSize: 16 },
   error: { fontSize: 14, lineHeight: 19 }, switch: { alignSelf: "center", marginTop: 24, padding: 8 },
-  server: { fontSize: 11, textAlign: "center", marginTop: 15 },
+  server: { fontSize: 11, textAlign: "center", marginTop: 15 }, changeServer: { alignSelf: "center", marginTop: 8, padding: 8 },
 });

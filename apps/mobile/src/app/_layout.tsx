@@ -3,9 +3,10 @@ import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { AuthProvider } from "@/providers/auth-provider";
+import { AuthProvider, useAuth } from "@/providers/auth-provider";
 import { QueryProvider } from "@/providers/query-provider";
 import { ThemeProvider, useAppTheme } from "@/providers/theme-provider";
+import { queryCacheKey } from "@/lib/api-origin";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -20,13 +21,17 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <QueryProvider>
-            <AuthProvider><RootNavigator /></AuthProvider>
-          </QueryProvider>
+          <AuthProvider><QueryBridge /></AuthProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
+}
+
+function QueryBridge() {
+  const { apiOrigin } = useAuth();
+  const cacheKey = queryCacheKey(apiOrigin);
+  return <QueryProvider key={cacheKey} storageKey={cacheKey}><RootNavigator /></QueryProvider>;
 }
 
 function RootNavigator() {

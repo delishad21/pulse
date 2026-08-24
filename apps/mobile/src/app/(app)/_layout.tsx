@@ -8,6 +8,7 @@ import { WidgetBridge } from "@/widgets/widget-bridge";
 export default function AppLayout() {
   const { status } = useAuth();
   const { palette } = useAppTheme();
+  if (status === "needs-server") return <Redirect href="/server" />;
   if (status === "unauthenticated") return <Redirect href="/login" />;
   if (status === "loading") return <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><ActivityIndicator color={palette.accent} /></View>;
   return <ResponsiveShell><WidgetBridge /><Slot /></ResponsiveShell>;
