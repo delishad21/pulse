@@ -84,6 +84,5 @@ The APK is also uploaded as a 30-day Actions artifact for every `main` build.
 ## Recommended repository settings
 
 Protect `main` and require the `Typecheck, lint, and test` check before merge.
-Enable GitHub secret scanning and push protection, and leave Dependabot enabled
-for npm, Docker, and GitHub Actions updates (the repository includes
-`.github/dependabot.yml`).
+Enable GitHub secret scanning and push protection. Dependabot version updates
+are disabled for this repository.
