@@ -37,22 +37,37 @@ enum OperationKind {
 }
 
 model User {
-  id         String      @id @default(cuid())
+  id           String      @id @default(cuid())
   username     String      @unique
   email        String?     @unique
   name         String?
   timezone     String      @default("UTC")
   passwordHash String?
-  tasks      Task[]
-  projects   Project[]
-  tags       Tag[]
-  comments   Comment[]
-  operations Operation[]
-  reminders  Reminder[]
-  events     TaskEvent[]
-  filters    Filter[]
-  createdAt  DateTime    @default(now()) @db.Timestamptz(3)
-  updatedAt  DateTime    @updatedAt @db.Timestamptz(3)
+  tasks        Task[]
+  projects     Project[]
+  tags         Tag[]
+  comments     Comment[]
+  operations   Operation[]
+  reminders    Reminder[]
+  events       TaskEvent[]
+  filters      Filter[]
+  apiKeys      ApiKey[]
+  createdAt    DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime    @updatedAt @db.Timestamptz(3)
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  tokenHash   String    @unique
+  tokenPrefix String
+  lastUsedAt  DateTime? @db.Timestamptz(3)
+  revokedAt   DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([userId, revokedAt, createdAt])
 }
 
 model Project {

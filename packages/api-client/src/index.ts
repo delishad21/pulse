@@ -18,6 +18,14 @@ export interface PulseApiClientOptions {
 export interface MobileUser { id: string; name: string; username: string; }
 export interface MobileSession { accessToken: string; expiresAt: string; user: MobileUser; }
 export interface MobileAuthConfig { authDisabled: boolean; registrationEnabled: boolean; }
+export interface ApiKeySummary {
+  id: string;
+  name: string;
+  tokenPrefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+export interface CreatedApiKey extends ApiKeySummary { token: string; }
 
 export interface TaskReminderInput { remindAt: string; channel?: string; }
 
@@ -110,6 +118,9 @@ export class PulseApiClient {
   getMobileAuthConfig(): Promise<MobileAuthConfig> { return this.request("GET", "/api/mobile-auth/config"); }
   loginMobile(input: { username: string; password: string }): Promise<MobileSession> { return this.request("POST", "/api/mobile-auth/login", input); }
   getMobileSession(): Promise<{ user: MobileUser }> { return this.request("GET", "/api/mobile-auth/me"); }
+  listApiKeys(): Promise<ApiKeySummary[]> { return this.request("GET", "/api/api-keys"); }
+  createApiKey(name: string): Promise<CreatedApiKey> { return this.request("POST", "/api/api-keys", { name }); }
+  revokeApiKey(id: string): Promise<void> { return this.request("DELETE", `/api/api-keys/${id}`); }
 
   listTasks(params?: Record<string, string>): Promise<Task[]> {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : "";

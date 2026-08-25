@@ -28,8 +28,14 @@ env:
   PULSE_API_BASE_URL: http://127.0.0.1:4000
 ```
 
-`PULSE_API_TOKEN` is forwarded as a bearer token when set.
+`PULSE_API_TOKEN` is forwarded as a bearer token when set. In a production
+deployment, create a named API key from the Pulse Settings page and provide it
+to the MCP process. The key is resolved to its owning Pulse user, so every MCP
+operation remains scoped to that account.
 
 ## Security note
 
-The current Pulse API still uses the local-development user identity and does not yet enforce service-token authorization. Until API authentication is hardened, keep the API and MCP server on the trusted local/private network only.
+API keys are bearer credentials. Keep them out of source control, prompts, and
+logs. The server stores only a SHA-256 hash, displays the raw key once, and lets
+the owner revoke it from Settings. Keep the API and MCP server on the trusted
+local/private network and use HTTPS for any traffic that leaves it.

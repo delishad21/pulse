@@ -81,7 +81,9 @@ services:
     profiles: ["mcp"]
     environment:
       PULSE_API_BASE_URL: http://api:4000
-      PULSE_API_TOKEN: ${PULSE_SERVICE_TOKEN}
+      # Prefer a user-scoped key created in Settings. The service-token fallback
+      # keeps existing installations working until their first key is configured.
+      PULSE_API_TOKEN: ${PULSE_MCP_API_KEY:-${PULSE_SERVICE_TOKEN}}
     depends_on:
       api:
         condition: service_healthy

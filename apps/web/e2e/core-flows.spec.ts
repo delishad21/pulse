@@ -24,6 +24,20 @@ test("authenticated session can sign out and protected pages redirect to login",
   await expect(page).toHaveURL(/\/login/);
 });
 
+test("settings creates and revokes a user-scoped MCP API key", async ({ page }) => {
+  await page.goto("/settings");
+  await page.getByLabel("API key name").fill("Hermes E2E");
+  await page.getByRole("button", { name: "Create key" }).click();
+  const dialog = page.getByRole("dialog", { name: "API key created" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel("Generated API key")).toHaveValue(/^pulse_[A-Za-z0-9_-]{43}$/);
+  await dialog.getByRole("button", { name: "Close API key" }).click();
+  await expect(page.getByText("Hermes E2E", { exact: true })).toBeVisible();
+  page.once("dialog", (confirmation) => confirmation.accept());
+  await page.getByRole("button", { name: "Revoke API key Hermes E2E" }).click();
+  await expect(page.getByText("Hermes E2E", { exact: true })).toHaveCount(0);
+});
+
 test("sidebar task creation, natural scheduling, and date grouping replace inline quick add", async ({ page }) => {
   await page.goto("/inbox");
   await expect(page.getByText("Search anything")).toHaveCount(0);

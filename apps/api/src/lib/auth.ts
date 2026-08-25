@@ -15,11 +15,15 @@ export interface AuthOptions {
   serviceToken?: string;
   requireAuth?: boolean;
   resolveUser?: (id: string) => Promise<RequestUser | null>;
+  resolveApiKey?: (token: string) => Promise<RequestUser | null>;
 }
+
+export type AuthKind = "default" | "web" | "service" | "apiKey";
 
 declare module "fastify" {
   interface FastifyRequest {
     user: RequestUser;
+    authKind: AuthKind;
   }
 }
 function tokenMatches(candidate: string, expected?: string): boolean {
@@ -43,14 +47,19 @@ export async function registerAuth(
 ): Promise<void> {
   const requireAuth = options.requireAuth ?? Boolean(options.webToken || options.serviceToken);
   app.decorateRequest("user", null as unknown as RequestUser);
+  app.decorateRequest("authKind", "default" as AuthKind);
   app.addHook("onRequest", async (request) => {
     request.user = defaultUser;
+    request.authKind = "default";
     if (request.url.startsWith("/api/health")) return;
     if (!requireAuth) return;
 
     const token = bearerToken(request);
     if (!token) throw Errors.Unauthorized();
-    if (tokenMatches(token, options.serviceToken)) return;
+    if (tokenMatches(token, options.serviceToken)) {
+      request.authKind = "service";
+      return;
+    }
 
     if (tokenMatches(token, options.webToken)) {
       const raw = request.headers["x-pulse-user-id"];
@@ -59,6 +68,14 @@ export async function registerAuth(
       const user = await options.resolveUser(userId);
       if (!user) throw Errors.Unauthorized();
       request.user = user;
+      request.authKind = "web";
+      return;
+    }
+
+    const apiKeyUser = await options.resolveApiKey?.(token);
+    if (apiKeyUser) {
+      request.user = apiKeyUser;
+      request.authKind = "apiKey";
       return;
     }
 
@@ -69,4 +86,8 @@ export async function registerAuth(
 export function getUser(request: FastifyRequest): RequestUser {
   if (!request.user) throw new Error("User not attached to request");
   return request.user;
+}
+
+export function requireUserSession(request: FastifyRequest): void {
+  if (request.authKind !== "web") throw Errors.Forbidden();
 }

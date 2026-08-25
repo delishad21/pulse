@@ -4,6 +4,7 @@ import { setRepository } from "./repositories/registry.js";
 import { registerAuth, type AuthOptions } from "./lib/auth.js";
 import { registerErrorHandler } from "./lib/errors.js";
 import { registerRoutes } from "./routes/index.js";
+import { resolveApiKey } from "./services/api-key-service.js";
 import type { PulseRepository } from "./repositories/types.js";
 
 export interface ServerOptions {
@@ -47,6 +48,7 @@ export async function buildApp(options: ServerOptions = {}) {
       const user = await prisma.user.findUnique({ where: { id } });
       return user ? { id: user.id, username: user.username, name: user.name, timezone: user.timezone } : null;
     },
+    resolveApiKey,
   });
   await registerErrorHandler(app);
   await registerRoutes(app);

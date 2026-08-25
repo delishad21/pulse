@@ -67,6 +67,21 @@ docker compose up -d --no-build api web
 Only the application services are recreated; database volumes and existing
 authentication settings remain untouched.
 
+## Hermes account binding
+
+After deployment, sign in to Pulse and create a named API key under **Settings
+→ API keys**. Add the one-time value to the home server's `.env`:
+
+```dotenv
+PULSE_MCP_API_KEY=pulse_replace-with-the-generated-key
+```
+
+The `pulse-mcp` launcher starts an ephemeral MCP container for Hermes, so the
+next MCP connection picks up the new key. The API resolves the key to its owner;
+`PULSE_DEFAULT_USERNAME` is no longer used for MCP requests once this key is
+configured. Revoke or rotate the key from Settings if the integration host is
+lost or compromised.
+
 The Docker Hub repositories may be public, in which case the server needs no
 additional setup. For private repositories, log in on the server once with a
 read-only Docker Hub token (`docker login`) and keep that credential on the

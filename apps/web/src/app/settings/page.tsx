@@ -4,6 +4,7 @@ import { Command, Palette } from "lucide-react";
 import { Shell } from "@/components/shell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LabelManager } from "@/components/label-manager";
+import { ApiKeyManager } from "@/components/api-key-manager";
 
 export default function SettingsPage() {
   return (
@@ -36,6 +37,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          <div className="border-b border-stroke p-5"><ApiKeyManager /></div>
           <div className="p-5"><LabelManager /></div>
         </div>
       </div>

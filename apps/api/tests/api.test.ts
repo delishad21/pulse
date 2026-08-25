@@ -7,6 +7,7 @@ import { clearRepository, setRepository } from "../src/repositories/registry.js"
 import * as taskService from "../src/services/task-service.js";
 
 const TEST_USER = { id: "test_user_1", username: "test-user", name: "Test User", timezone: "UTC" };
+const API_KEY_USER = { id: "api_key_user", username: "api-key-user", name: "API Key User", timezone: "Asia/Singapore" };
 
 async function createTestClient(repository = createMemoryRepository(TEST_USER.id)) {
   const app = await buildApp({ repository, defaultUser: TEST_USER });
@@ -36,8 +37,8 @@ test("health endpoints are reachable", async () => {
   }
 });
 
-test("production auth binds web requests to a resolved user while service auth keeps the default identity", async () => {
-  const repository = createMemoryRepository(TEST_USER.id);
+test("production auth binds web and API-key requests to their user while service auth keeps the default identity", async () => {
+  const repository = createMemoryRepository(TEST_USER.id, [API_KEY_USER.id]);
   const app = await buildApp({
     repository,
     defaultUser: TEST_USER,
@@ -45,6 +46,7 @@ test("production auth binds web requests to a resolved user while service auth k
       webToken: "web-secret",
       serviceToken: "service-secret",
       resolveUser: async (id) => id === TEST_USER.id ? TEST_USER : null,
+      resolveApiKey: async (token) => token === "pulse-user-key" ? API_KEY_USER : null,
     },
   });
   const baseUrl = await app.listen({ port: 0 });
@@ -63,6 +65,12 @@ test("production auth binds web requests to a resolved user while service auth k
 
     const serviceClient = new PulseApiClient({ baseUrl, getAccessToken: async () => "service-secret" });
     assert.deepEqual(await serviceClient.listTasks(), []);
+
+    const apiKeyClient = new PulseApiClient({ baseUrl, getAccessToken: async () => "pulse-user-key" });
+    const apiKeyTask = await apiKeyClient.createTask({ title: "API key owned task" });
+    assert.equal(apiKeyTask.userId, API_KEY_USER.id);
+    assert.deepEqual(await serviceClient.listTasks(), []);
+    assert.equal((await fetch(`${baseUrl}/api/api-keys`, { headers: { Authorization: "Bearer pulse-user-key" } })).status, 403);
   } finally {
     await app.close();
     clearRepository();

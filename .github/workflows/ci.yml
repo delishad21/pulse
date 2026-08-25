@@ -58,6 +58,7 @@ jobs:
           PULSE_DB_PASSWORD: ci-only-password
           PULSE_WEB_TOKEN: ci-only-web-token
           PULSE_SERVICE_TOKEN: ci-only-service-token
+          PULSE_MCP_API_KEY: pulse_ci-only-user-api-key
           AUTH_SECRET: ci-only-auth-secret
           AUTH_URL: https://pulse.example.com
         run: docker compose -f compose.yaml config --quiet
