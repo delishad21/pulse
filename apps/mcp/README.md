@@ -14,24 +14,32 @@ Thin MCP adapter for Pulse. It exposes semantic task actions and delegates every
 
 ## Runtime
 
-The monorepo's shared packages are TypeScript source packages, so run the MCP server through `tsx`:
-
-```bash
-PULSE_API_BASE_URL=http://127.0.0.1:4000 npm run start -w @pulse/mcp
-```
-For an MCP client such as Hermes, invoke the `tsx` binary directly so npm's lifecycle output cannot pollute the stdio protocol stream:
+The production MCP is a persistent Streamable HTTP server. It listens on
+`/mcp` inside the container at port `6060`; the Compose file publishes it on
+loopback port `6061` for Hermes by default:
 
 ```text
-command: <repo>/node_modules/.bin/tsx
-args: ["<repo>/apps/mcp/src/index.ts"]
-env:
-  PULSE_API_BASE_URL: http://127.0.0.1:4000
+url: http://127.0.0.1:6061/mcp
+headers:
+  Authorization: Bearer <the-same-key-as-PULSE_MCP_API_KEY>
 ```
 
-`PULSE_API_TOKEN` is forwarded as a bearer token when set. In a production
-deployment, create a named API key from the Pulse Settings page and provide it
-to the MCP process. The key is resolved to its owning Pulse user, so every MCP
-operation remains scoped to that account.
+`PULSE_API_TOKEN` is used both to authenticate Hermes at the MCP boundary and
+to authenticate the MCP's requests to Pulse. In a production deployment,
+create a named API key from the Pulse Settings page and provide it to the
+Portainer-managed MCP container. The key is resolved to its owning Pulse user,
+so every MCP operation remains scoped to that account.
+
+For local development, run the HTTP server directly:
+
+```bash
+PULSE_API_BASE_URL=http://127.0.0.1:4000 \
+PULSE_API_TOKEN=local-token \
+PULSE_MCP_PORT=6060 \
+npm run start -w @pulse/mcp
+```
+
+The unauthenticated `/health` endpoint is intended for the container healthcheck.
 
 ## Security note
 

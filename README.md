@@ -47,13 +47,17 @@ To reset an existing user's password, use the same pattern with
 deployment's `compose.yaml` and `.env` file.
 
 Each signed-in user can create named, revocable API keys under **Settings → API
-keys**. Pulse displays a new key once and stores only its hash. To bind the
-Docker MCP adapter—and therefore Hermes—to that user, place the key in the
-deployment `.env` and restart the Hermes MCP connection:
+keys**. Pulse displays a new key once and stores only its hash. The production
+MCP is a persistent HTTP container managed by Portainer. To bind it—and
+therefore Hermes—to that user, add the key to the Portainer stack environment:
 
 ```dotenv
 PULSE_MCP_API_KEY=pulse_replace-with-the-generated-key
+PULSE_MCP_IMAGE=docker.io/<dockerhub-namespace>/pulse-mcp:latest
+PULSE_MCP_HOST_PORT=6061
 ```
 
-The MCP container receives this value as `PULSE_API_TOKEN`. Existing
-installations fall back to `PULSE_SERVICE_TOKEN` until a user key is configured.
+The container receives this value as `PULSE_API_TOKEN`, serves
+`http://127.0.0.1:6061/mcp`, and requires the same bearer key from Hermes.
+Existing installations fall back to `PULSE_SERVICE_TOKEN` until a user key is
+configured.

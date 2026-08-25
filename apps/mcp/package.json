@@ -12,6 +12,7 @@
     "lint": "eslint src tests"
   },
   "dependencies": {
+    "@modelcontextprotocol/node": "2.0.0",
     "@modelcontextprotocol/server": "^2.0.0",
     "@pulse/api-client": "*",
     "dotenv": "^16.6.1",

@@ -59,6 +59,7 @@ jobs:
           PULSE_WEB_TOKEN: ci-only-web-token
           PULSE_SERVICE_TOKEN: ci-only-service-token
           PULSE_MCP_API_KEY: pulse_ci-only-user-api-key
+          PULSE_MCP_HOST_PORT: 6061
           AUTH_SECRET: ci-only-auth-secret
           AUTH_URL: https://pulse.example.com
         run: docker compose -f compose.yaml config --quiet
@@ -112,6 +113,16 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag
 
+      - name: Docker metadata (MCP)
+        id: mcp-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: docker.io/${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}/pulse-mcp
+          tags: |
+            type=sha,prefix=,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
+
       - name: Build and push API image
         uses: docker/build-push-action@v6
         with:
@@ -133,6 +144,17 @@ jobs:
           labels: ${{ steps.web-meta.outputs.labels }}
           cache-from: type=gha,scope=pulse-web
           cache-to: type=gha,mode=max,scope=pulse-web
+
+      - name: Build and push MCP image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: mcp
+          push: true
+          tags: ${{ steps.mcp-meta.outputs.tags }}
+          labels: ${{ steps.mcp-meta.outputs.labels }}
+          cache-from: type=gha,scope=pulse-mcp
+          cache-to: type=gha,mode=max,scope=pulse-mcp
 
   android-apk:
     name: Build signed Android APK

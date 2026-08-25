@@ -1,7 +1,7 @@
 # Pulse CI/CD
 
 The `Pulse CI/CD` workflow in `.github/workflows/ci.yml` runs the monorepo
-checks, publishes the API and web images to Docker Hub, and builds a signed
+checks, publishes the API, web, and MCP images to Docker Hub, and builds a signed
 Android APK. A tag such as `v1.0.1` also creates a GitHub Release with the APK
 attached. The home server is updated manually by pulling the `latest` images.
 
@@ -11,7 +11,7 @@ Add these repository secrets under **Settings → Secrets and variables →
 Actions**:
 
 - `DOCKERHUB_USERNAME`: Docker Hub account that owns the `pulse-api` and
-  `pulse-web` repositories.
+  `pulse-web` and `pulse-mcp` repositories.
 - `DOCKERHUB_TOKEN`: a Docker Hub access token with permission to push those
   repositories.
 - `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
@@ -48,24 +48,22 @@ APK (uninstall the debug build once if Android refuses the update).
 ## Home-server updates
 
 The production `compose.yaml` accepts complete image references through
-`PULSE_API_IMAGE` and `PULSE_WEB_IMAGE`. Set these two values in the home
-server's `.env` to the Docker Hub `latest` tags, for example:
+`PULSE_API_IMAGE`, `PULSE_WEB_IMAGE`, and `PULSE_MCP_IMAGE`. In Portainer, set
+these values in the stack environment to the Docker Hub `latest` tags, for
+example:
 
 ```dotenv
 PULSE_API_IMAGE=docker.io/<dockerhub-namespace>/pulse-api:latest
 PULSE_WEB_IMAGE=docker.io/<dockerhub-namespace>/pulse-web:latest
+PULSE_MCP_IMAGE=docker.io/<dockerhub-namespace>/pulse-mcp:latest
+PULSE_MCP_HOST_PORT=6061
 ```
 
-After a successful `main` build, update the server manually:
+After a successful `main` build, use Portainer's **Re-pull image and redeploy**
+action for the `pulse` stack. The MCP service is no longer profile-gated and
+will run continuously alongside the API and web services.
 
-```sh
-cd /home/delishad21/services/pulse
-docker compose pull api web
-docker compose up -d --no-build api web
-```
-
-Only the application services are recreated; database volumes and existing
-authentication settings remain untouched.
+The database volume and existing authentication settings remain untouched.
 
 ## Hermes account binding
 
@@ -76,11 +74,11 @@ After deployment, sign in to Pulse and create a named API key under **Settings
 PULSE_MCP_API_KEY=pulse_replace-with-the-generated-key
 ```
 
-The `pulse-mcp` launcher starts an ephemeral MCP container for Hermes, so the
-next MCP connection picks up the new key. The API resolves the key to its owner;
-`PULSE_DEFAULT_USERNAME` is no longer used for MCP requests once this key is
-configured. Revoke or rotate the key from Settings if the integration host is
-lost or compromised.
+The persistent `pulse-mcp` container serves `http://127.0.0.1:6061/mcp` and
+requires the same key as its Hermes bearer token. The API resolves the key to
+its owner; `PULSE_DEFAULT_USERNAME` is no longer used for MCP requests once
+this key is configured. Revoke or rotate the key from Settings if the
+integration host is lost or compromised.
 
 The Docker Hub repositories may be public, in which case the server needs no
 additional setup. For private repositories, log in on the server once with a

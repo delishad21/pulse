@@ -77,13 +77,17 @@ services:
     build:
       context: .
       target: mcp
-    image: pulse-mcp:local
-    profiles: ["mcp"]
+    image: ${PULSE_MCP_IMAGE:-pulse-mcp:local}
+    restart: unless-stopped
     environment:
       PULSE_API_BASE_URL: http://api:4000
       # Prefer a user-scoped key created in Settings. The service-token fallback
       # keeps existing installations working until their first key is configured.
       PULSE_API_TOKEN: ${PULSE_MCP_API_KEY:-${PULSE_SERVICE_TOKEN}}
+      PULSE_MCP_PORT: 6060
+      PULSE_MCP_HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:${PULSE_MCP_HOST_PORT:-6061}:6060"
     depends_on:
       api:
         condition: service_healthy
