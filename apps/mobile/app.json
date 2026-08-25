@@ -14,6 +14,7 @@
     },
     "android": {
       "package": "com.pulse.tasks",
+      "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
@@ -45,36 +46,80 @@
               "name": "PulseToday",
               "displayName": "Pulse Today",
               "description": "Your open tasks for today.",
-              "ios": { "supportedFamilies": ["systemSmall", "systemMedium", "systemLarge"] },
-              "android": { "targetCellWidth": 3, "targetCellHeight": 3, "resizeMode": "both" }
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium",
+                  "systemLarge"
+                ]
+              },
+              "android": {
+                "targetCellWidth": 3,
+                "targetCellHeight": 3,
+                "resizeMode": "both"
+              }
             },
             {
               "name": "PulseInbox",
               "displayName": "Pulse Inbox",
               "description": "Unscheduled tasks in your inbox.",
-              "ios": { "supportedFamilies": ["systemSmall", "systemMedium", "systemLarge"] },
-              "android": { "targetCellWidth": 3, "targetCellHeight": 3, "resizeMode": "both" }
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium",
+                  "systemLarge"
+                ]
+              },
+              "android": {
+                "targetCellWidth": 3,
+                "targetCellHeight": 3,
+                "resizeMode": "both"
+              }
             },
             {
               "name": "PulseUpcoming",
               "displayName": "Pulse Upcoming",
               "description": "Your next scheduled tasks.",
-              "ios": { "supportedFamilies": ["systemMedium", "systemLarge", "systemExtraLarge"] },
-              "android": { "targetCellWidth": 4, "targetCellHeight": 3, "resizeMode": "both" }
+              "ios": {
+                "supportedFamilies": [
+                  "systemMedium",
+                  "systemLarge",
+                  "systemExtraLarge"
+                ]
+              },
+              "android": {
+                "targetCellWidth": 4,
+                "targetCellHeight": 3,
+                "resizeMode": "both"
+              }
             },
             {
               "name": "PulseOverdue",
               "displayName": "Pulse Overdue",
               "description": "Tasks that need your attention.",
-              "ios": { "supportedFamilies": ["systemSmall", "systemMedium"] },
-              "android": { "targetCellWidth": 3, "targetCellHeight": 2, "resizeMode": "both" }
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium"
+                ]
+              },
+              "android": {
+                "targetCellWidth": 3,
+                "targetCellHeight": 2,
+                "resizeMode": "both"
+              }
             },
             {
               "name": "PulseTasks",
               "displayName": "Pulse Tasks",
               "description": "A customizable task list.",
               "ios": {
-                "supportedFamilies": ["systemSmall", "systemMedium", "systemLarge", "systemExtraLarge"],
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium",
+                  "systemLarge",
+                  "systemExtraLarge"
+                ],
                 "configuration": {
                   "title": "Task list",
                   "description": "Choose the task view and amount of detail.",
@@ -83,19 +128,43 @@
                       "title": "View",
                       "type": "enum",
                       "values": [
-                        { "name": "Today", "value": "today" },
-                        { "name": "Inbox", "value": "inbox" },
-                        { "name": "Upcoming", "value": "upcoming" },
-                        { "name": "Overdue", "value": "overdue" }
+                        {
+                          "name": "Today",
+                          "value": "today"
+                        },
+                        {
+                          "name": "Inbox",
+                          "value": "inbox"
+                        },
+                        {
+                          "name": "Upcoming",
+                          "value": "upcoming"
+                        },
+                        {
+                          "name": "Overdue",
+                          "value": "overdue"
+                        }
                       ],
                       "default": "today"
                     },
-                    "showDue": { "title": "Show dates", "type": "boolean", "default": true },
-                    "showProject": { "title": "Show projects", "type": "boolean", "default": true }
+                    "showDue": {
+                      "title": "Show dates",
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "showProject": {
+                      "title": "Show projects",
+                      "type": "boolean",
+                      "default": true
+                    }
                   }
                 }
               },
-              "android": { "targetCellWidth": 4, "targetCellHeight": 4, "resizeMode": "both" }
+              "android": {
+                "targetCellWidth": 4,
+                "targetCellHeight": 4,
+                "resizeMode": "both"
+              }
             }
           ]
         }
@@ -105,6 +174,30 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "ExpoWidgetsTarget",
+                  "bundleIdentifier": "com.pulse.tasks.ExpoWidgetsTarget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.pulse.tasks"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "30d248cb-906d-460a-a68a-97de446bcd06"
+      }
+    },
+    "owner": "delishad21"
   }
 }
