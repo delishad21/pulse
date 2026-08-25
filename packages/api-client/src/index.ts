@@ -26,6 +26,34 @@ export interface ApiKeySummary {
   lastUsedAt: string | null;
 }
 export interface CreatedApiKey extends ApiKeySummary { token: string; }
+export interface NotificationPreferences {
+  enabled: boolean;
+  hermesEnabled: boolean;
+  fallbackEnabled: boolean;
+  fallbackAfterSeconds: number;
+  emailEnabled: boolean;
+  emailAddress: string | null;
+  pushEnabled: boolean;
+  quietHoursEnabled: boolean;
+  quietStart: string;
+  quietEnd: string;
+  quietMode: "delay" | "silent" | "send";
+  includeDescription: boolean;
+  includeProject: boolean;
+  includeDue: boolean;
+  includePriority: boolean;
+  deliveryStyle: "compact" | "detailed";
+  defaultLeadMinutes: number[];
+  snoozeMinutes: number[];
+  telegramChatId: string | null;
+  telegramThreadId: string | null;
+  hermesConfigured: boolean;
+  fallbackConfigured: boolean;
+  emailConfigured: boolean;
+  pushConfigured: boolean;
+  registeredPushDevices: number;
+}
+export type UpdateNotificationPreferences = Omit<NotificationPreferences, "hermesConfigured" | "fallbackConfigured" | "emailConfigured" | "pushConfigured" | "registeredPushDevices">;
 
 export interface TaskReminderInput { remindAt: string; channel?: string; }
 
@@ -121,6 +149,10 @@ export class PulseApiClient {
   listApiKeys(): Promise<ApiKeySummary[]> { return this.request("GET", "/api/api-keys"); }
   createApiKey(name: string): Promise<CreatedApiKey> { return this.request("POST", "/api/api-keys", { name }); }
   revokeApiKey(id: string): Promise<void> { return this.request("DELETE", `/api/api-keys/${id}`); }
+  getNotificationPreferences(): Promise<NotificationPreferences> { return this.request("GET", "/api/notification-preferences"); }
+  updateNotificationPreferences(input: Partial<UpdateNotificationPreferences>): Promise<NotificationPreferences> { return this.request("PATCH", "/api/notification-preferences", input); }
+  registerPushDevice(token: string, platform: "ios" | "android"): Promise<void> { return this.request("POST", "/api/push-devices", { token, platform }); }
+  unregisterPushDevice(token: string): Promise<void> { return this.request("DELETE", "/api/push-devices", { token }); }
 
   listTasks(params?: Record<string, string>): Promise<Task[]> {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : "";

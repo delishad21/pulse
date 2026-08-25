@@ -52,6 +52,9 @@ model User {
   events       TaskEvent[]
   filters      Filter[]
   apiKeys      ApiKey[]
+  notificationPreference NotificationPreference?
+  reminderDeliveries ReminderDelivery[]
+  pushDevices   PushDevice[]
   createdAt    DateTime    @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime    @updatedAt @db.Timestamptz(3)
 }
@@ -173,12 +176,78 @@ model Reminder {
   remindAt  DateTime  @db.Timestamptz(3)
   channel   String    @default("hermes_telegram")
   status    String    @default("pending")
+  claimToken String?
+  claimedAt DateTime? @db.Timestamptz(3)
+  nextAttemptAt DateTime? @db.Timestamptz(3)
+  attemptCount Int @default(0)
+  deliveredAt DateTime? @db.Timestamptz(3)
+  lastError String?
+  deliveries ReminderDelivery[]
   createdAt DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @db.Timestamptz(3)
   deletedAt DateTime? @db.Timestamptz(3)
 
   @@index([userId, remindAt, status, deletedAt])
+  @@index([status, remindAt, nextAttemptAt, deletedAt], map: "Reminder_dispatch_idx")
   @@index([taskId, deletedAt])
+}
+
+model NotificationPreference {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled            Boolean  @default(false)
+  hermesEnabled      Boolean  @default(true)
+  fallbackEnabled    Boolean  @default(true)
+  fallbackAfterSeconds Int    @default(15)
+  emailEnabled       Boolean  @default(false)
+  emailAddress       String?
+  pushEnabled        Boolean  @default(false)
+  quietHoursEnabled  Boolean  @default(false)
+  quietStart         String   @default("22:00")
+  quietEnd           String   @default("07:00")
+  quietMode          String   @default("delay")
+  includeDescription Boolean  @default(true)
+  includeProject     Boolean  @default(true)
+  includeDue         Boolean  @default(true)
+  includePriority    Boolean  @default(true)
+  deliveryStyle      String   @default("detailed")
+  defaultLeadMinutes Json     @default("[0,10,60]")
+  snoozeMinutes      Json     @default("[10,60]")
+  telegramChatId     String?
+  telegramThreadId   String?
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model PushDevice {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String   @unique
+  platform   String
+  active     Boolean  @default(true)
+  lastSeenAt DateTime @default(now()) @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([userId, active, lastSeenAt])
+}
+
+model ReminderDelivery {
+  id          String   @id @default(cuid())
+  reminderId  String
+  reminder    Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel     String
+  status      String
+  externalId  String?
+  error       String?
+  attemptedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([reminderId, attemptedAt])
+  @@index([userId, attemptedAt])
 }
 
 model TaskEvent {

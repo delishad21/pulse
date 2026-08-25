@@ -1,7 +1,7 @@
 # Pulse CI/CD
 
 The `Pulse CI/CD` workflow in `.github/workflows/ci.yml` runs the monorepo
-checks, publishes the API, web, and MCP images to Docker Hub, and builds a signed
+checks, publishes the API, web, MCP, and reminder-worker images to Docker Hub, and builds a signed
 Android APK. A tag such as `v1.0.1` also creates a GitHub Release with the APK
 attached. The home server is updated manually by pulling the `latest` images.
 
@@ -10,8 +10,8 @@ attached. The home server is updated manually by pulling the `latest` images.
 Add these repository secrets under **Settings → Secrets and variables →
 Actions**:
 
-- `DOCKERHUB_USERNAME`: Docker Hub account that owns the `pulse-api` and
-  `pulse-web` and `pulse-mcp` repositories.
+- `DOCKERHUB_USERNAME`: Docker Hub account that owns the `pulse-api`,
+  `pulse-web`, `pulse-mcp`, and `pulse-reminder-worker` repositories.
 - `DOCKERHUB_TOKEN`: a Docker Hub access token with permission to push those
   repositories.
 - `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
@@ -48,7 +48,8 @@ APK (uninstall the debug build once if Android refuses the update).
 ## Home-server updates
 
 The production `compose.yaml` accepts complete image references through
-`PULSE_API_IMAGE`, `PULSE_WEB_IMAGE`, and `PULSE_MCP_IMAGE`. In Portainer, set
+`PULSE_API_IMAGE`, `PULSE_WEB_IMAGE`, `PULSE_MCP_IMAGE`, and
+`PULSE_REMINDER_WORKER_IMAGE`. In Portainer, set
 these values in the stack environment to the Docker Hub `latest` tags, for
 example:
 
@@ -56,12 +57,23 @@ example:
 PULSE_API_IMAGE=docker.io/<dockerhub-namespace>/pulse-api:latest
 PULSE_WEB_IMAGE=docker.io/<dockerhub-namespace>/pulse-web:latest
 PULSE_MCP_IMAGE=docker.io/<dockerhub-namespace>/pulse-mcp:latest
+PULSE_REMINDER_WORKER_IMAGE=docker.io/<dockerhub-namespace>/pulse-reminder-worker:latest
 PULSE_MCP_HOST_PORT=6061
 ```
 
 After a successful `main` build, use Portainer's **Re-pull image and redeploy**
 action for the `pulse` stack. The MCP service is no longer profile-gated and
 will run continuously alongside the API and web services.
+
+Reminder delivery additionally uses `HERMES_REMINDER_WEBHOOK_URL`,
+`HERMES_REMINDER_WEBHOOK_SECRET`, `TELEGRAM_FALLBACK_BOT_TOKEN`,
+`TELEGRAM_REMINDER_CHAT_ID`, and `TELEGRAM_REMINDER_THREAD_ID`. Keep these in
+the Portainer stack environment. The fallback token may remain empty until the
+separate bot has been created; Hermes delivery remains available without it.
+Optional email delivery uses `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
+`SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM`. Phone notifications use Expo
+Push; set `EXPO_ACCESS_TOKEN` only when push security is enabled for the Expo
+project, and configure the mobile app's Expo project and FCM/APNs credentials.
 
 The database volume and existing authentication settings remain untouched.
 

@@ -9,6 +9,7 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/mcp/package.json apps/mcp/package.json
 COPY apps/mobile/package.json apps/mobile/package.json
+COPY apps/reminder-worker/package.json apps/reminder-worker/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/api-client/package.json packages/api-client/package.json
 COPY packages/db/package.json packages/db/package.json
@@ -32,6 +33,10 @@ FROM source AS mcp
 ENV NODE_ENV=production
 EXPOSE 6060
 CMD ["./node_modules/.bin/tsx", "apps/mcp/src/index.ts"]
+
+FROM source AS reminder-worker
+ENV NODE_ENV=production
+CMD ["./node_modules/.bin/tsx", "apps/reminder-worker/src/index.ts"]
 
 FROM source AS web
 ENV NODE_ENV=production

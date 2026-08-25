@@ -1,0 +1,25 @@
+{
+  "name": "@pulse/reminder-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src tests",
+    "test": "tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "@pulse/db": "*",
+    "@pulse/domain": "*",
+    "dotenv": "^16.6.1",
+    "nodemailer": "^8.0.11"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/nodemailer": "^8.0.1",
+    "tsx": "^4",
+    "typescript": "^6.0.3"
+  }
+}

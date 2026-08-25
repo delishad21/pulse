@@ -123,6 +123,16 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag
 
+      - name: Docker metadata (reminder worker)
+        id: reminder-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: docker.io/${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}/pulse-reminder-worker
+          tags: |
+            type=sha,prefix=,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
+
       - name: Build and push API image
         uses: docker/build-push-action@v6
         with:
@@ -155,6 +165,17 @@ jobs:
           labels: ${{ steps.mcp-meta.outputs.labels }}
           cache-from: type=gha,scope=pulse-mcp
           cache-to: type=gha,mode=max,scope=pulse-mcp
+
+      - name: Build and push reminder worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: reminder-worker
+          push: true
+          tags: ${{ steps.reminder-meta.outputs.tags }}
+          labels: ${{ steps.reminder-meta.outputs.labels }}
+          cache-from: type=gha,scope=pulse-reminder-worker
+          cache-to: type=gha,mode=max,scope=pulse-reminder-worker
 
   android-apk:
     name: Build signed Android APK

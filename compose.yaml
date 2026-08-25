@@ -34,6 +34,11 @@ services:
       PULSE_LEGACY_DEFAULT_USER_EMAIL: ${PULSE_LEGACY_DEFAULT_USER_EMAIL:-}
       PULSE_DEFAULT_USER_NAME: ${PULSE_DEFAULT_USER_NAME:-Pulse User}
       PULSE_DEFAULT_TIMEZONE: ${PULSE_DEFAULT_TIMEZONE:-Asia/Singapore}
+      HERMES_REMINDER_WEBHOOK_URL: ${HERMES_REMINDER_WEBHOOK_URL:-}
+      HERMES_REMINDER_WEBHOOK_SECRET: ${HERMES_REMINDER_WEBHOOK_SECRET:-}
+      TELEGRAM_FALLBACK_BOT_TOKEN: ${TELEGRAM_FALLBACK_BOT_TOKEN:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_FROM: ${SMTP_FROM:-}
     depends_on:
       db:
         condition: service_healthy
@@ -89,6 +94,36 @@ services:
     ports:
       - "127.0.0.1:${PULSE_MCP_HOST_PORT:-6061}:6060"
     depends_on:
+      api:
+        condition: service_healthy
+    networks: [internal, edge]
+
+  reminder-worker:
+    build:
+      context: .
+      target: reminder-worker
+    image: ${PULSE_REMINDER_WORKER_IMAGE:-pulse-reminder-worker:local}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://pulse:${PULSE_DB_PASSWORD}@db:5432/pulse
+      HERMES_REMINDER_WEBHOOK_URL: ${HERMES_REMINDER_WEBHOOK_URL:-}
+      HERMES_REMINDER_WEBHOOK_SECRET: ${HERMES_REMINDER_WEBHOOK_SECRET:-}
+      TELEGRAM_FALLBACK_BOT_TOKEN: ${TELEGRAM_FALLBACK_BOT_TOKEN:-}
+      TELEGRAM_REMINDER_CHAT_ID: ${TELEGRAM_REMINDER_CHAT_ID:--1004469714848}
+      TELEGRAM_REMINDER_THREAD_ID: ${TELEGRAM_REMINDER_THREAD_ID:-3}
+      PULSE_PUBLIC_URL: ${AUTH_URL:-}
+      REMINDER_POLL_INTERVAL_MS: ${REMINDER_POLL_INTERVAL_MS:-5000}
+      REMINDER_MAX_ATTEMPTS: ${REMINDER_MAX_ATTEMPTS:-8}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
+    depends_on:
+      db:
+        condition: service_healthy
       api:
         condition: service_healthy
     networks: [internal, edge]
