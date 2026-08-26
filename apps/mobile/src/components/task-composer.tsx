@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, ChevronDown, Flag, Folder, MapPin, Repeat2, Tag as TagIcon, Trash2, X } from "lucide-react-native";
+import { AlarmClock, CalendarDays, ChevronDown, Flag, Folder, MapPin, Repeat2, Tag as TagIcon, Trash2, X } from "lucide-react-native";
 import { forwardRef, useEffect, useMemo, useRef, useState, type ForwardedRef, type ReactNode } from "react";
 import { Alert, Animated, Easing, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View, type NativeSyntheticEvent, type TextInputKeyPressEventData } from "react-native";
 import type { CreateTaskInput, Task, UpdateTaskInput } from "@pulse/api-client";
@@ -14,7 +14,8 @@ import { useAuth } from "@/providers/auth-provider";
 import { useAppTheme } from "@/providers/theme-provider";
 import { syncPulseWidgets } from "@/widgets/sync";
 
-type PickerKind = "project" | "priority" | "labels" | "recurrence" | "location" | null;
+type PickerKind = "project" | "priority" | "labels" | "recurrence" | "location" | "reminders" | null;
+type ReminderDraft = { index: number | null; date: string; time: string };
 const priorities: Priority[] = ["none", "low", "medium", "high", "urgent"];
 const weekdayChoices: [Weekday, string][] = [["MO", "Monday"], ["TU", "Tuesday"], ["WE", "Wednesday"], ["TH", "Thursday"], ["FR", "Friday"], ["SA", "Saturday"], ["SU", "Sunday"]];
 const rule = (frequency: "daily" | "weekly" | "monthly" | "yearly", interval = 1, byWeekday?: Weekday[]) => generateRecurrenceRule({ frequency, interval, byWeekday });
@@ -26,6 +27,8 @@ const recurrenceChoices = [
 ];
 const timePart = (instant?: string | null) => instant ? `${String(new Date(instant).getHours()).padStart(2, "0")}:${String(new Date(instant).getMinutes()).padStart(2, "0")}` : "";
 const makeInstant = (date: string, time: string) => { const [year, month, day] = date.split("-").map(Number); const [hour, minute] = time.split(":").map(Number); return new Date(year, month - 1, day, hour, minute, 0, 0).toISOString(); };
+const localDateTime = (instant: string) => { const date = new Date(instant); const offset = date.getTimezoneOffset() * 60_000; return new Date(date.getTime() - offset).toISOString().slice(0, 16); };
+const reminderLabel = (value: string) => new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(makeInstant(value.slice(0, 10), value.slice(11, 16))));
 
 export function TaskComposer({ visible, task, defaultProjectId = null, onClose }: { visible: boolean; task?: Task | null; defaultProjectId?: string | null; onClose: () => void }) {
   return <TaskComposerForm visible={visible} task={task} defaultProjectId={defaultProjectId} onClose={onClose} />;
@@ -47,7 +50,8 @@ function TaskComposerForm({ visible, task, defaultProjectId, onClose }: { visibl
   const [dueDate, setDueDate] = useState<string | null>(task?.due.date ?? (initialInstant ? localDateKey(new Date(initialInstant)) : null)); const [startTime, setStartTime] = useState(timePart(initialInstant)); const [endTime, setEndTime] = useState(timePart(task?.endAt));
   const [projectId, setProjectId] = useState<string | null>(task?.projectId ?? defaultProjectId); const [priority, setPriority] = useState<Priority>(task?.priority ?? "none"); const [tagIds, setTagIds] = useState<string[]>(task?.tags.map((tag) => tag.id) ?? []);
   const [location, setLocation] = useState(task?.location ?? ""); const [recurrenceRule, setRecurrenceRule] = useState<string | null>(task?.recurrenceRule ?? null); const [customDays, setCustomDays] = useState("7");
-  const [picker, setPicker] = useState<PickerKind>(null); const [dateOpen, setDateOpen] = useState(false); const [error, setError] = useState<string | null>(null); const [selection, setSelection] = useState({ start: rawTitle.length, end: rawTitle.length }); const [ignored, setIgnored] = useState<Set<string>>(() => new Set());
+  const [reminders, setReminders] = useState<string[]>(() => task?.reminders.map((reminder) => localDateTime(reminder.remindAt)) ?? []);
+  const [picker, setPicker] = useState<PickerKind>(null); const [dateOpen, setDateOpen] = useState(false); const [reminderDateOpen, setReminderDateOpen] = useState(false); const [reminderDraft, setReminderDraft] = useState<ReminderDraft | null>(null); const reminderDraftRef = useRef<ReminderDraft | null>(null); const [error, setError] = useState<string | null>(null); const [selection, setSelection] = useState({ start: rawTitle.length, end: rawTitle.length }); const [ignored, setIgnored] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     if (visible && !wasVisible.current) {
@@ -63,9 +67,13 @@ function TaskComposerForm({ visible, task, defaultProjectId, onClose }: { visibl
       setTagIds(task?.tags.map((tag) => tag.id) ?? []);
       setLocation(task?.location ?? "");
       setRecurrenceRule(task?.recurrenceRule ?? null);
+      setReminders(task?.reminders.map((reminder) => localDateTime(reminder.remindAt)) ?? []);
       setSelection({ start: nextTitle.length, end: nextTitle.length });
       setPicker(null);
       setDateOpen(false);
+      setReminderDateOpen(false);
+      setReminderDraft(null);
+      reminderDraftRef.current = null;
       setError(null);
       setIgnored(new Set());
       ignoredBackspace.current = null;
@@ -110,13 +118,44 @@ function TaskComposerForm({ visible, task, defaultProjectId, onClose }: { visibl
     Keyboard.dismiss();
     setPicker(null);
     setDateOpen(false);
+    setReminderDateOpen(false);
+    setReminderDraft(null);
+    reminderDraftRef.current = null;
     onClose();
+  };
+
+  const openReminderPicker = (index: number | null = null) => {
+    const existing = index === null ? null : reminders[index];
+    const scheduled = task?.due.at ?? task?.startAt;
+    const value = existing ?? (scheduled ? localDateTime(scheduled) : `${localDateKey()}T09:00`);
+    const next = { index, date: value.slice(0, 10), time: value.slice(11, 16) };
+    reminderDraftRef.current = next;
+    setReminderDraft(next);
+    setPicker(null);
+    setReminderDateOpen(true);
+  };
+  const closeReminderPicker = () => { setReminderDateOpen(false); setReminderDraft(null); reminderDraftRef.current = null; };
+  const updateReminderDraftDate = (date: string | null) => {
+    const current = reminderDraftRef.current;
+    if (!current) return;
+    if (!date) {
+      if (current.index !== null) setReminders((values) => values.filter((_, index) => index !== current.index));
+      closeReminderPicker();
+      return;
+    }
+    const next = { ...current, date }; reminderDraftRef.current = next; setReminderDraft(next);
+  };
+  const saveReminderDraft = (time: string) => {
+    const current = reminderDraftRef.current;
+    if (!current || !current.date || !time) return;
+    const value = `${current.date}T${time}`;
+    setReminders((values) => current.index === null ? [...values, value].slice(0, 20) : values.map((item, index) => index === current.index ? value : item));
   };
 
   const saveMutation = useMutation({ mutationFn: async () => {
     const title = parsed.input.title || rawTitle.trim(); if (!title) throw new Error("Give the task a title."); let manualStart: string | null = null; let manualEnd: string | null = null;
     if (dueDate && startTime) { manualStart = makeInstant(dueDate, startTime); if (endTime) { manualEnd = makeInstant(dueDate, endTime); if (new Date(manualEnd) < new Date(manualStart)) { const next = new Date(manualEnd); next.setDate(next.getDate() + 1); manualEnd = next.toISOString(); } } }
-    const common: CreateTaskInput & UpdateTaskInput = { title, description: description.trim() || null, location: (has("location") ? parsed.input.location : location.trim()) || null, priority: effectivePriority, projectId: effectiveProjectId, tagIds: effectiveTagIds, recurrenceRule: has("recurrence") ? parsed.input.recurrenceRule ?? null : recurrenceRule, dueDate: has("time") ? null : hasParsedScheduleDate ? parsed.input.dueDate ?? null : manualStart ? null : dueDate, dueAt: null, startAt: has("time") ? parsed.input.startAt ?? null : manualStart, endAt: has("time") ? parsed.input.endAt ?? null : manualEnd };
+    const common: CreateTaskInput & UpdateTaskInput = { title, description: description.trim() || null, location: (has("location") ? parsed.input.location : location.trim()) || null, priority: effectivePriority, projectId: effectiveProjectId, tagIds: effectiveTagIds, recurrenceRule: has("recurrence") ? parsed.input.recurrenceRule ?? null : recurrenceRule, dueDate: has("time") ? null : hasParsedScheduleDate ? parsed.input.dueDate ?? null : manualStart ? null : dueDate, dueAt: null, startAt: has("time") ? parsed.input.startAt ?? null : manualStart, endAt: has("time") ? parsed.input.endAt ?? null : manualEnd, reminders: reminders.map((value) => ({ remindAt: makeInstant(value.slice(0, 10), value.slice(11, 16)), channel: "hermes_telegram" })) };
     return task ? api.updateTask(task.id, common) : api.createTask(common);
   }, onSuccess: async () => { await queryClient.invalidateQueries(); await syncPulseWidgets(api).catch(() => undefined); closeComposer(); }, onError: (value) => setError(value instanceof Error ? value.message : "Could not save this task.") });
   const deleteMutation = useMutation({ mutationFn: () => api.deleteTask(task!.id), onSuccess: async () => { await queryClient.invalidateQueries(); await syncPulseWidgets(api).catch(() => undefined); closeComposer(); } });
@@ -124,6 +163,7 @@ function TaskComposerForm({ visible, task, defaultProjectId, onClose }: { visibl
   const remove = () => Alert.alert("Delete task?", "This task can still be recovered through operation history.", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate() }]);
   const panelHeight = Math.min(Math.max(height * (width >= 700 ? 0.66 : 0.6), 320), width >= 700 ? 720 : 600); const modalWidth = Math.min(width, 640);
   const scheduleLabel = effectiveDueDate ? `${formatDayHeading(effectiveDueDate).split(",")[0]}${has("time") || startTime ? ` · ${has("time") ? timePart(parsed.input.startAt) : startTime}` : ""}` : "Date & time";
+  const remindersLabel = reminders.length ? `${reminders.length} reminder${reminders.length === 1 ? "" : "s"}` : "Reminders";
 
   const showComposer = () => {
     animation.current?.stop();
@@ -152,7 +192,7 @@ function TaskComposerForm({ visible, task, defaultProjectId, onClose }: { visibl
       <ScrollView keyboardShouldPersistTaps="handled" style={styles.scroller} contentContainerStyle={styles.body}>
         {mention && <View style={[styles.suggestions, { backgroundColor: palette.surface, borderColor: palette.border }]}>{mention.items.map((item) => <Pressable key={item.id} onPress={() => insertMention(item.name)} style={({ pressed }) => [styles.suggestion, pressed && { backgroundColor: palette.accentSoft }]}><View style={[styles.colorDot, { backgroundColor: item.color ?? palette.textMuted }]} /><AppText style={styles.suggestionText}>{mention.marker}{item.name}</AppText></Pressable>)}</View>}
         <TextInput value={description} onChangeText={setDescription} placeholder="Description" placeholderTextColor={palette.textMuted} multiline showSoftInputOnFocus style={[styles.descriptionInput, { color: palette.text }]} selectionColor={palette.accent} />
-        <View style={styles.toolbar}><ComposerButton icon={CalendarDays} label={scheduleLabel} color={effectiveDueDate || has("time") ? palette.accent : palette.textMuted} onPress={() => openAccessory("date")} /><ComposerButton icon={Folder} label={selectedProject?.name ?? "Inbox"} color={selectedProject?.color ?? palette.textMuted} onPress={() => openAccessory("project")} /><ComposerButton icon={Flag} label={effectivePriority === "none" ? "Priority" : effectivePriority[0].toUpperCase() + effectivePriority.slice(1)} color={priorityColors[effectivePriority]} onPress={() => openAccessory("priority")} /><ComposerButton icon={TagIcon} label={effectiveTagIds.length ? `${effectiveTagIds.length} label${effectiveTagIds.length === 1 ? "" : "s"}` : "Labels"} color={effectiveTagIds.length ? tags.find((tag) => effectiveTagIds.includes(tag.id))?.color ?? palette.accent : palette.textMuted} onPress={() => openAccessory("labels")} /><ComposerButton icon={Repeat2} label={recurrenceRule || has("recurrence") ? "Repeats" : "Repeat"} color={recurrenceRule || has("recurrence") ? palette.accent : palette.textMuted} onPress={() => openAccessory("recurrence")} /><ComposerButton icon={MapPin} label={(has("location") ? parsed.input.location : location) || "Location"} color={(has("location") ? parsed.input.location : location) ? palette.accent : palette.textMuted} onPress={() => openAccessory("location")} /></View>
+        <View style={styles.toolbar}><ComposerButton icon={CalendarDays} label={scheduleLabel} color={effectiveDueDate || has("time") ? palette.accent : palette.textMuted} onPress={() => openAccessory("date")} /><ComposerButton icon={AlarmClock} label={remindersLabel} color={reminders.length ? palette.accent : palette.textMuted} onPress={() => openAccessory("reminders")} /><ComposerButton icon={Folder} label={selectedProject?.name ?? "Inbox"} color={selectedProject?.color ?? palette.textMuted} onPress={() => openAccessory("project")} /><ComposerButton icon={Flag} label={effectivePriority === "none" ? "Priority" : effectivePriority[0].toUpperCase() + effectivePriority.slice(1)} color={priorityColors[effectivePriority]} onPress={() => openAccessory("priority")} /><ComposerButton icon={TagIcon} label={effectiveTagIds.length ? `${effectiveTagIds.length} label${effectiveTagIds.length === 1 ? "" : "s"}` : "Labels"} color={effectiveTagIds.length ? tags.find((tag) => effectiveTagIds.includes(tag.id))?.color ?? palette.accent : palette.textMuted} onPress={() => openAccessory("labels")} /><ComposerButton icon={Repeat2} label={recurrenceRule || has("recurrence") ? "Repeats" : "Repeat"} color={recurrenceRule || has("recurrence") ? palette.accent : palette.textMuted} onPress={() => openAccessory("recurrence")} /><ComposerButton icon={MapPin} label={(has("location") ? parsed.input.location : location) || "Location"} color={(has("location") ? parsed.input.location : location) ? palette.accent : palette.textMuted} onPress={() => openAccessory("location")} /></View>
         {error && <AppText style={{ color: palette.danger, fontSize: 14, marginTop: 10 }}>{error}</AppText>}
       </ScrollView>
       <View style={[styles.footer, { borderTopColor: palette.border }]}>{task ? <Pressable accessibilityRole="button" accessibilityLabel="Delete task" onPress={remove} hitSlop={8} style={({ pressed }) => [styles.deleteButton, { backgroundColor: palette.danger + "18", opacity: pressed ? 0.6 : 1 }]}><Trash2 size={20} color={palette.danger} /></Pressable> : <View />}<View style={styles.footerActions}>{task && task.status === "open" && <Pressable accessibilityRole="button" accessibilityLabel="Complete task" disabled={completeMutation.isPending} onPress={() => completeMutation.mutate()} style={({ pressed }) => [styles.completeButton, { backgroundColor: palette.surface, borderColor: palette.border, opacity: pressed || completeMutation.isPending ? 0.6 : 1 }]}><Text style={[styles.completeText, { color: palette.accent }]}>{completeMutation.isPending ? "Completing…" : "Complete"}</Text></Pressable>}<PrimaryButton loading={saveMutation.isPending} onPress={() => saveMutation.mutate()} style={styles.save}>{task ? "Save" : "Add task"}</PrimaryButton></View></View>
@@ -162,9 +202,18 @@ function TaskComposerForm({ visible, task, defaultProjectId, onClose }: { visibl
       {picker === "project" && <><SelectionRow label="Inbox" color={palette.textMuted} selected={!effectiveProjectId} onPress={() => { setProjectId(null); setPicker(null); }} />{projects.map((project) => <SelectionRow key={project.id} label={project.name} color={project.color ?? palette.textMuted} selected={effectiveProjectId === project.id} onPress={() => { setProjectId(project.id); setPicker(null); }} />)}</>}
       {picker === "priority" && priorities.map((value) => <SelectionRow key={value} label={value[0].toUpperCase() + value.slice(1)} color={priorityColors[value]} selected={effectivePriority === value} flag onPress={() => { setPriority(value); setPicker(null); }} />)}
       {picker === "labels" && tags.map((tag) => <SelectionRow key={tag.id} label={tag.name} color={tag.color ?? palette.textMuted} selected={effectiveTagIds.includes(tag.id)} onPress={() => setTagIds((values) => values.includes(tag.id) ? values.filter((id) => id !== tag.id) : [...values, tag.id])} />)}
+      {picker === "reminders" && <View style={styles.remindersPanel}>
+        <AppText muted style={styles.remindersHint}>Choose one or more times for this task. Delivery follows your reminder settings.</AppText>
+        {reminders.map((value, index) => <View key={`${value}-${index}`} style={[styles.reminderRow, { borderBottomColor: palette.border }]}>
+          <Pressable onPress={() => openReminderPicker(index)} style={styles.reminderPressable}><AlarmClock size={18} color={palette.accent} /><View style={styles.reminderCopy}><AppText style={styles.reminderTitle}>Reminder {index + 1}</AppText><AppText muted style={styles.reminderValue}>{reminderLabel(value)}</AppText></View></Pressable>
+          <IconButton icon={Trash2} label={`Remove reminder ${index + 1}`} onPress={() => setReminders((values) => values.filter((_, reminderIndex) => reminderIndex !== index))} />
+        </View>)}
+        <Pressable disabled={reminders.length >= 20} onPress={() => openReminderPicker()} style={({ pressed }) => [styles.addReminder, { backgroundColor: palette.accentSoft, opacity: pressed || reminders.length >= 20 ? 0.55 : 1 }]}><AlarmClock size={17} color={palette.accent} /><AppText style={{ color: palette.accent, fontWeight: "700" }}>{reminders.length >= 20 ? "Maximum reminders reached" : "Add reminder"}</AppText></Pressable>
+      </View>}
       {picker === "recurrence" && <>{recurrenceChoices.map((choice) => <SelectionRow key={choice.label} label={choice.label} color={palette.accent} selected={recurrenceRule === choice.value} hideIndicator onPress={() => { setRecurrenceRule(choice.value); setPicker(null); }} />)}<View style={[styles.customRow, { borderTopColor: palette.border }]}><AppText style={styles.customLabel}>Every</AppText><TextInput value={customDays} onChangeText={(value) => setCustomDays(value.replace(/\D/g, "").slice(0, 3))} keyboardType="number-pad" showSoftInputOnFocus style={[styles.customInput, { color: palette.text, backgroundColor: palette.surface }]} /><AppText style={styles.customLabel}>days</AppText><Pressable onPress={() => { const days = Math.max(1, Number(customDays) || 1); setCustomDays(String(days)); setRecurrenceRule(rule("daily", days)); setPicker(null); }} style={[styles.customApply, { backgroundColor: palette.accent }]}><Text style={styles.customApplyText}>Apply</Text></Pressable></View></>}
       {picker === "location" && <View style={styles.locationPanel}><AppText muted style={styles.locationHint}>Location</AppText><TextInput autoFocus showSoftInputOnFocus value={location} onChangeText={setLocation} placeholder="e.g. Marina Bay" placeholderTextColor={palette.textMuted} style={[styles.locationInput, { color: palette.text, backgroundColor: palette.surface }]} /><PrimaryButton onPress={() => setPicker(null)} style={styles.locationDone}>Done</PrimaryButton></View>}
     </SelectionModal>
+    <DatePickerModal key={`${reminderDraft?.index ?? "new"}-${reminderDateOpen}`} visible={reminderDateOpen} value={reminderDraft?.date ?? null} startTime={reminderDraft?.time ?? "09:00"} endTime="" onChange={updateReminderDraftDate} onTimeChange={(start) => saveReminderDraft(start)} onClose={closeReminderPicker} />
     </View>
   </Modal>;
 }
@@ -185,6 +234,7 @@ const styles = StyleSheet.create({
   modalRoot: { flex: 1 }, modalOverlay: { ...StyleSheet.absoluteFill }, keyboardUnderlay: { position: "absolute", left: 0, right: 0, bottom: 0 }, backdrop: { flex: 1, alignItems: "center", justifyContent: "flex-end" }, panel: { overflow: "hidden", borderTopLeftRadius: 22, borderTopRightRadius: 22, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 28, elevation: 16 }, topbar: { minHeight: 74, flexDirection: "row", alignItems: "flex-start", paddingTop: 10, paddingLeft: 18, paddingRight: 10 }, scroller: { flexGrow: 0, flexShrink: 1 }, body: { paddingHorizontal: 18, paddingBottom: 0 },
   titleInputShell: { position: "relative", minHeight: 60, flex: 1, marginLeft: 9 }, iosTitleContent: { paddingTop: 12 }, titleHighlight: { ...titleTypography, minHeight: 60, position: "absolute", top: 0, left: 0, right: 0, color: "transparent" }, titleInput: { ...titleTypography, minHeight: 60, borderWidth: 0, backgroundColor: "transparent", zIndex: 1 }, descriptionInput: { fontFamily: AppFont, minHeight: 61, paddingHorizontal: 9, paddingTop: 5, fontSize: 15.5, lineHeight: 22, textAlignVertical: "top", borderWidth: 0 },
   suggestions: { marginHorizontal: 7, borderWidth: StyleSheet.hairlineWidth, borderRadius: 11, paddingVertical: 4 }, suggestion: { minHeight: 38, flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 11 }, suggestionText: { fontSize: 14, fontWeight: "600" }, toolbar: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 }, toolButton: { height: 36, borderRadius: 9, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 6, maxWidth: 190 },
+  remindersPanel: { paddingHorizontal: 20, paddingBottom: 12 }, remindersHint: { fontSize: 12, lineHeight: 17, marginBottom: 5 }, reminderRow: { minHeight: 62, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center" }, reminderPressable: { flex: 1, minHeight: 62, flexDirection: "row", alignItems: "center", gap: 12 }, reminderCopy: { flex: 1 }, reminderTitle: { fontSize: 14, fontWeight: "700" }, reminderValue: { fontSize: 12, marginTop: 2 }, addReminder: { minHeight: 44, marginTop: 12, borderRadius: 10, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 8 },
   footer: { marginTop: 8, borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingTop: 6, paddingBottom: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, footerActions: { flexDirection: "row", alignItems: "center", gap: 8 }, save: { minWidth: 116, minHeight: 44 }, completeButton: { minWidth: 106, minHeight: 44, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, alignItems: "center", justifyContent: "center" }, completeText: { fontFamily: AppFontBold, fontSize: 15, fontWeight: "normal" }, deleteButton: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center" }, selectionBackdrop: { flex: 1, justifyContent: "flex-end", alignItems: "center" }, selectionPanel: { width: "100%", maxWidth: 560, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 24, maxHeight: "72%" }, selectionHeader: { height: 58, paddingLeft: 20, paddingRight: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, selectionTitle: { fontFamily: AppFontBold, fontSize: 17, fontWeight: "normal" }, selectionRow: { minHeight: 50, flexDirection: "row", alignItems: "center", paddingHorizontal: 20, gap: 12 }, selectionLabel: { flex: 1, fontFamily: AppFont, fontSize: 15 }, colorDot: { width: 13, height: 13, borderRadius: 7 },
   customRow: { minHeight: 62, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 20, marginTop: 5 }, customLabel: { fontFamily: AppFont, fontSize: 14 }, customInput: { fontFamily: AppFontBold, width: 58, height: 38, borderRadius: 9, textAlign: "center", fontWeight: "normal" }, customApply: { marginLeft: "auto", height: 38, paddingHorizontal: 14, borderRadius: 9, justifyContent: "center" }, customApplyText: { color: "#fff", fontFamily: AppFontBold, fontWeight: "normal" }, locationPanel: { paddingHorizontal: 20, paddingBottom: 12 }, locationHint: { fontFamily: AppFontBold, fontSize: 12, fontWeight: "normal", marginBottom: 6 }, locationInput: { fontFamily: AppFont, height: 44, borderRadius: 10, paddingHorizontal: 12, fontSize: 15 }, locationDone: { marginTop: 14 },
 });
