@@ -2,7 +2,7 @@
   "expo": {
     "name": "Pulse",
     "slug": "pulse",
-    "version": "1.0.0",
+    "version": "1.0.4",
     "orientation": "default",
     "icon": "./assets/images/pulse-app-icon.png",
     "scheme": "pulse",
@@ -16,7 +16,7 @@
       "package": "com.pulse.tasks",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff",
+        "backgroundColor": "#0b0b0c",
         "foregroundImage": "./assets/images/pulse-adaptive-foreground.png"
       },
       "predictiveBackGestureEnabled": false
@@ -30,9 +30,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#ffffff",
-          "image": "./assets/images/pulse-app-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#0b0b0c",
+          "image": "./assets/images/pulse-logo.png",
+          "imageWidth": 96
         }
       ],
       [

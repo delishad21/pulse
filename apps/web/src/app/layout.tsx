@@ -6,7 +6,7 @@ import { ThemeScript } from "@/components/theme-script";
 export const metadata: Metadata = {
   title: "Pulse",
   description: "Your tasks, everywhere.",
-  icons: { icon: "/pulse-waveform-logo.png", apple: "/pulse-waveform-logo.png" },
+  icons: { icon: "/pulse-logo.png", apple: "/pulse-app-icon.png" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
