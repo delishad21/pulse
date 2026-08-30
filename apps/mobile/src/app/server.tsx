@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 20 },
   card: { paddingVertical: 30 },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  logoImage: { width: 58, height: 47 },
+  logoImage: { width: 48, height: 48 },
   logo: { fontSize: 38, fontWeight: "800", letterSpacing: -1.4 },
   heading: { fontSize: 24, fontWeight: "700", marginTop: 32 },
   subtitle: { fontSize: 15, lineHeight: 21, marginTop: 7 },

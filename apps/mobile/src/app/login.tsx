@@ -62,7 +62,7 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 }, scroll: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 20 },
-  card: { paddingVertical: 30 }, brandRow: { flexDirection: "row", alignItems: "center", gap: 10 }, logoImage: { width: 58, height: 47 }, logo: { fontSize: 38, fontWeight: "800", letterSpacing: -1.4 },
+  card: { paddingVertical: 30 }, brandRow: { flexDirection: "row", alignItems: "center", gap: 10 }, logoImage: { width: 48, height: 48 }, logo: { fontSize: 38, fontWeight: "800", letterSpacing: -1.4 },
   subtitle: { fontSize: 16, marginTop: 5 }, form: { marginTop: 34, gap: 13 },
   input: { fontFamily: AppFont, height: 52, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, fontSize: 16 },
   error: { fontSize: 14, lineHeight: 19 }, switch: { alignSelf: "center", marginTop: 24, padding: 8 },

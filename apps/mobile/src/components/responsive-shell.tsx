@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   compactRoot: { flex: 1 },
   content: { flex: 1, minWidth: 0 },
   sidebar: { width: 224, borderRightWidth: StyleSheet.hairlineWidth, paddingHorizontal: 15, paddingTop: 20 },
-  brandRow: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 8, marginBottom: 26 }, brandLogo: { width: 48, height: 40 }, brand: { fontSize: 25, fontFamily: AppFontBold, fontWeight: "normal", letterSpacing: -0.8 },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 8, marginBottom: 26 }, brandLogo: { width: 40, height: 40 }, brand: { fontSize: 25, fontFamily: AppFontBold, fontWeight: "normal", letterSpacing: -0.8 },
   sideNav: { gap: 3 },
   sideItem: { height: 46, borderRadius: 10, flexDirection: "row", alignItems: "center", paddingHorizontal: 13, gap: 12 },
   sideLabel: { fontSize: 15 },
