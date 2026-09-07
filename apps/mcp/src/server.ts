@@ -1,9 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/server";
-import { PulseApiClient, PulseApiError, type CreateTaskInput, type Task, type UpdateTaskInput } from "@pulse/api-client";
+import { PulseApiClient, PulseApiError, type CreateProjectInput, type CreateTaskInput, type Task, type UpdateTaskInput } from "@pulse/api-client";
 import { z } from "zod";
 
 export type PulseMcpApi = Pick<PulseApiClient,
-  "getToday"|"getInbox"|"searchTasks"|"createTask"|"updateTask"|"completeTask"|"rescheduleTask"|"getTask"|"getUpcoming"|"getOverdue"|"reopenTask"|"cancelTask"|"moveTask"|"bulkComplete"|"bulkReschedule"|"bulkMove"|"listProjects"|"listTags"|"setTaskLabels"|"listReminders"|"createReminder"|"updateReminder"|"deleteReminder"|"createComment"|"getTaskHistory"
+  "getToday"|"getInbox"|"searchTasks"|"createTask"|"updateTask"|"completeTask"|"rescheduleTask"|"getTask"|"getUpcoming"|"getOverdue"|"reopenTask"|"cancelTask"|"moveTask"|"bulkComplete"|"bulkReschedule"|"bulkMove"|"listProjects"|"createProject"|"listTags"|"setTaskLabels"|"listReminders"|"createReminder"|"updateReminder"|"deleteReminder"|"createComment"|"getTaskHistory"
 >;
 
 const prioritySchema=z.enum(["none","low","medium","high","urgent"]);
@@ -23,6 +23,7 @@ const bulkIdsSchema=z.object({ids:z.array(z.string().min(1)).min(1).max(1000)});
 const bulkMoveSchema=bulkIdsSchema.extend({projectId:z.string().nullable()});
 const bulkRescheduleSchema=bulkIdsSchema.extend({startAt:instantSchema.nullable().optional(),endAt:instantSchema.nullable().optional(),dueDate:dateOnlySchema.nullable().optional(),dueAt:instantSchema.nullable().optional()});
 const rescheduleTaskSchema=z.object({id:z.string().min(1),startAt:instantSchema.nullable().optional(),endAt:instantSchema.nullable().optional(),dueDate:dateOnlySchema.nullable().optional(),dueAt:instantSchema.nullable().optional(),recurrenceRule:z.string().nullable().optional(),reminders:z.array(reminderSchema).max(20).optional()});
+const createProjectSchema=z.object({name:z.string().trim().min(1).max(200),description:z.string().max(5000).nullable().optional(),color:z.string().max(50).nullable().optional(),icon:z.string().max(50).nullable().optional()});
 const commentSchema=taskIdSchema.extend({body:z.string().trim().min(1).max(10000)});
 const labelsSchema=taskIdSchema.extend({tagIds:z.array(z.string()).max(100)});
 const reminderIdSchema=z.object({reminderId:z.string().min(1)});
@@ -51,6 +52,7 @@ export function createPulseMcpServer(api:PulseMcpApi):McpServer{
   server.registerTool("bulk_complete_tasks",{description:"Complete multiple tasks as one logical operation.",inputSchema:bulkIdsSchema},async({ids})=>run(async()=>tasksResult(await api.bulkComplete({ids}))));
   server.registerTool("bulk_reschedule_tasks",{description:"Change schedule/deadline fields on multiple tasks.",inputSchema:bulkRescheduleSchema},async({ids,...schedule})=>run(async()=>tasksResult(await api.bulkReschedule({ids,...schedule}))));
   server.registerTool("bulk_move_tasks",{description:"Move multiple tasks to a project or Inbox.",inputSchema:bulkMoveSchema},async({ids,projectId})=>run(async()=>tasksResult(await api.bulkMove({ids,projectId}))));
+  server.registerTool("create_project",{description:"Create a Pulse project. Use name for the project title and optionally provide a description, color, or icon.",inputSchema:createProjectSchema},async(input)=>run(async()=>({project:await api.createProject(input as CreateProjectInput)})));
   server.registerTool("get_projects",{description:"List Pulse projects so project names can be resolved to projectId.",inputSchema:z.object({}),annotations:{readOnlyHint:true}},async()=>run(async()=>({projects:await api.listProjects()})));
   server.registerTool("get_labels",{description:"List Pulse labels so @label names can be resolved to tagIds.",inputSchema:z.object({}),annotations:{readOnlyHint:true}},async()=>run(async()=>({labels:await api.listTags()})));
   server.registerTool("set_task_labels",{description:"Replace the labels on a task with the supplied tagIds.",inputSchema:labelsSchema},async({id,tagIds})=>run(async()=>({task:await api.setTaskLabels(id,tagIds)})));

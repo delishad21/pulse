@@ -11,6 +11,8 @@ Thin MCP adapter for Pulse. It exposes semantic task actions and delegates every
 - `update_task`
 - `complete_task`
 - `reschedule_task`
+- `create_project`
+- `get_projects`
 
 ## Runtime
 

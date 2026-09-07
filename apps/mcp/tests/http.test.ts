@@ -28,7 +28,7 @@ test("serves MCP over persistent authenticated Streamable HTTP", async () => {
     assert.equal((await fetch(endpoint)).status, 401);
     await client.connect(transport);
     const tools = await client.listTools();
-    assert.equal(tools.tools.length, 25);
+    assert.equal(tools.tools.length, 26);
   } finally {
     await client.close();
     await new Promise<void>((resolve) => server.close(() => resolve()));
