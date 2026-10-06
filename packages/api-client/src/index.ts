@@ -145,7 +145,8 @@ export class PulseApiClient {
 
   getMobileAuthConfig(): Promise<MobileAuthConfig> { return this.request("GET", "/api/mobile-auth/config"); }
   loginMobile(input: { username: string; password: string }): Promise<MobileSession> { return this.request("POST", "/api/mobile-auth/login", input); }
-  getMobileSession(): Promise<{ user: MobileUser }> { return this.request("GET", "/api/mobile-auth/me"); }
+  /** Validates the session; newer servers also return a renewed token. */
+  getMobileSession(): Promise<{ user: MobileUser } & Partial<Pick<MobileSession, "accessToken" | "expiresAt">>> { return this.request("GET", "/api/mobile-auth/me"); }
   listApiKeys(): Promise<ApiKeySummary[]> { return this.request("GET", "/api/api-keys"); }
   createApiKey(name: string): Promise<CreatedApiKey> { return this.request("POST", "/api/api-keys", { name }); }
   revokeApiKey(id: string): Promise<void> { return this.request("DELETE", `/api/api-keys/${id}`); }

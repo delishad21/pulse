@@ -9,7 +9,10 @@ export interface MobileTokenClaims {
 }
 
 const TOKEN_VERSION = "pulse-mobile-v1";
-const TOKEN_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
+// Mobile sessions only end when the user signs out. The app renews its token
+// through /api/mobile-auth/me on every launch, so this is a sliding window that
+// only lapses after a full year without opening the app.
+const TOKEN_LIFETIME_SECONDS = 365 * 24 * 60 * 60;
 
 function secret(): string {
   const value = process.env.AUTH_SECRET;

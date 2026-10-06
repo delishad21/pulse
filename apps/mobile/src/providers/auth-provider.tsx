@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import { PulseApiClient, PulseApiError, type MobileUser } from "@pulse/api-client";
+import { PulseApiClient, PulseApiError, type MobileAuthConfig, type MobileUser } from "@pulse/api-client";
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { environmentApiOrigin, normalizeApiOrigin, queryCacheKey } from "@/lib/api-origin";
 
@@ -86,25 +86,49 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (!serverOrigin) return;
     let alive = true;
     (async () => {
+      // Restore the saved session before touching the network so the app opens
+      // signed in while offline or while the server is unreachable.
+      let session: StoredSession | null = null;
       try {
-        const config = await api.getMobileAuthConfig();
-        if (!alive) return;
-        setRegistrationEnabled(config.registrationEnabled);
-        if (config.authDisabled) {
-          setUser({ id: "development", name: "Pulse", username: "development" });
-          setStatus("authenticated");
-          return;
-        }
         const raw = await getStoredSession();
-        if (!raw) { setStatus("unauthenticated"); return; }
-        const session = JSON.parse(raw) as StoredSession;
-        if (new Date(session.expiresAt) <= new Date()) throw new Error("Session expired");
+        if (raw) session = JSON.parse(raw) as StoredSession;
+      } catch { /* Unreadable storage is treated as signed out below if the server agrees. */ }
+      if (!alive) return;
+      if (session) {
         mobileAccessToken = session.accessToken;
+        setUser(session.user);
+        setStatus("authenticated");
+      }
+
+      let config: MobileAuthConfig;
+      try {
+        config = await api.getMobileAuthConfig();
+      } catch {
+        if (alive && !session) setStatus("unauthenticated");
+        return;
+      }
+      if (!alive) return;
+      setRegistrationEnabled(config.registrationEnabled);
+      if (config.authDisabled) {
+        setUser({ id: "development", name: "Pulse", username: "development" });
+        setStatus("authenticated");
+        return;
+      }
+      if (!session) { setStatus("unauthenticated"); return; }
+
+      try {
         const current = await api.getMobileSession();
         if (!alive) return;
         setUser(current.user);
-        setStatus("authenticated");
-      } catch {
+        const renewed: StoredSession = current.accessToken && current.expiresAt
+          ? { accessToken: current.accessToken, expiresAt: current.expiresAt, user: current.user }
+          : { ...session, user: current.user };
+        mobileAccessToken = renewed.accessToken;
+        await setStoredSession(JSON.stringify(renewed));
+      } catch (error) {
+        // Only an explicit rejection of the token ends the session. Network
+        // failures, timeouts, and server errors keep the user signed in.
+        if (!(error instanceof PulseApiError && error.status === 401)) return;
         mobileAccessToken = null;
         if (alive) { setUser(null); setStatus("unauthenticated"); }
         await setStoredSession(null).catch(() => undefined);

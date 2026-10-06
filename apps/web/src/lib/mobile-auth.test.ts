@@ -8,5 +8,6 @@ test("mobile tokens are signed, expire, and reject tampering", () => {
   const { accessToken } = issueMobileToken({ id: "user-1", name: "Johan", username: "johan" }, now);
   assert.equal(verifyMobileToken(accessToken, now)?.sub, "user-1");
   assert.equal(verifyMobileToken(`${accessToken}x`, now), null);
-  assert.equal(verifyMobileToken(accessToken, new Date("2026-10-01T10:00:00.000Z")), null);
+  assert.equal(verifyMobileToken(accessToken, new Date("2027-08-23T10:00:00.000Z"))?.sub, "user-1");
+  assert.equal(verifyMobileToken(accessToken, new Date("2027-08-25T10:00:00.000Z")), null);
 });
