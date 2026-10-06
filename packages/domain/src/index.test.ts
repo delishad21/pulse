@@ -56,7 +56,11 @@ test("upcoming and overdue semantics",()=>{
   assert.equal(isTaskUpcoming({...baseTask,startAt:"2026-08-21T09:00:00Z"},now),true);
   assert.equal(isTaskUpcoming({...baseTask,due:{date:"2026-08-20",at:null}},now),false);
   assert.equal(isTaskOverdue({...baseTask,due:{date:"2026-08-19",at:null}},now),true);
-  assert.equal(isTaskOverdue({...baseTask,startAt:"2026-08-19T09:00:00Z",due:{date:null,at:null}},now),false);
+  assert.equal(isTaskOverdue({...baseTask,startAt:"2026-08-19T09:00:00Z",due:{date:null,at:null}},now),true);
+  assert.equal(isTaskOverdue({...baseTask,startAt:"2026-08-20T13:00:00Z",due:{date:null,at:null}},now),false);
+  assert.equal(isTaskOverdue({...baseTask,startAt:"2026-08-20T11:00:00Z",endAt:"2026-08-20T13:00:00Z",due:{date:null,at:null}},now),false);
+  assert.equal(isTaskOverdue({...baseTask,startAt:"2026-08-20T10:00:00Z",endAt:"2026-08-20T11:00:00Z",due:{date:null,at:null}},now),true);
+  assert.equal(isTaskOverdue({...baseTask,startAt:"2026-08-19T09:00:00Z",due:{date:"2026-08-21",at:null}},now),false);
 });
 test("completed and focus semantics",()=>{
   const now=new Date("2026-08-20T12:00:00Z");

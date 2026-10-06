@@ -13,7 +13,9 @@ export function taskDateKey(task: Task): string | null {
 export function taskIsOverdue(task: Task, now = new Date()): boolean {
   if (task.status !== "open") return false;
   if (task.due.at) return new Date(task.due.at) < now;
-  return Boolean(task.due.date && task.due.date < localDateKey(now));
+  if (task.due.date) return task.due.date < localDateKey(now);
+  const scheduledUntil = task.endAt ?? task.startAt;
+  return Boolean(scheduledUntil && new Date(scheduledUntil) < now);
 }
 
 export function formatTaskDate(task: Task): string | null {

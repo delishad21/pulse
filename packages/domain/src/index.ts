@@ -217,7 +217,10 @@ export function isTaskOverdue(task: Task, now: Date, timezone = "UTC"): boolean 
   const bounds = dayBoundsInTimezone(now, timezone);
   if (task.due.date) return task.due.date < bounds.date;
   if (task.due.at) return new Date(task.due.at) < now;
-  return false;
+  // Without a due date, a scheduled task is overdue once its time block ends
+  // (or once it starts, when it has no end).
+  const scheduledUntil = task.endAt ?? task.startAt;
+  return scheduledUntil !== null && new Date(scheduledUntil) < now;
 }
 
 export function isTaskCompleted(task: Task): boolean {

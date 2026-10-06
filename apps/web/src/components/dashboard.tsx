@@ -49,8 +49,11 @@ function EmptyTasks({ message, compact = false }: { message: string; compact?: b
 }
 
 function isOverdueTask(task: Task): boolean {
+  if (task.status !== "open") return false;
   if (task.due.date) return task.due.date < localDateKey(new Date());
-  return Boolean(task.due.at && new Date(task.due.at).getTime() < Date.now());
+  if (task.due.at) return new Date(task.due.at).getTime() < Date.now();
+  const scheduledUntil = task.endAt ?? task.startAt;
+  return Boolean(scheduledUntil && new Date(scheduledUntil).getTime() < Date.now());
 }
 
 function OverdueSection({ tasks, onEditTask }: {
@@ -96,8 +99,8 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
   const overdueTasks = filter.type === "today"
     ? (overdueQuery.data ?? []).filter((task) => includeProjectTasks || task.projectId === null)
     : filtered.filter(isOverdueTask);
-  const visibleTasks = filter.type === "inbox" ? filtered.filter((task) => !isOverdueTask(task)) : filtered;
-  const visibleCount = filtered.length + (filter.type === "today" ? overdueTasks.length : 0);
+  const visibleTasks = filter.type === "inbox" || filter.type === "today" ? filtered.filter((task) => !isOverdueTask(task)) : filtered;
+  const visibleCount = filter.type === "today" ? visibleTasks.length + overdueTasks.length : filtered.length;
   const project =
     filter.type === "project"
       ? projects?.find((p) => p.id === filter.projectId)
@@ -169,7 +172,7 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
           isLoading ? <div className="h-36 animate-pulse border-t border-stroke" /> : (
             <div>
               <OverdueSection tasks={overdueTasks} onEditTask={setEditingTask} />
-              {filtered.length ? <div className="border-t border-stroke"><TaskList tasks={filtered} onEditTask={setEditingTask} /></div> : overdueTasks.length ? null : <EmptyTasks message="Nothing scheduled for today." compact />}
+              {visibleTasks.length ? <div className="border-t border-stroke"><TaskList tasks={visibleTasks} onEditTask={setEditingTask} /></div> : overdueTasks.length ? null : <EmptyTasks message="Nothing scheduled for today." compact />}
               {composerKey === "today" ? <TaskComposer defaultDate={localDateKey(new Date())} onCancel={() => setComposerKey(null)} onCreated={() => setComposerKey(null)} className="mt-2" /> : <button type="button" onClick={() => setComposerKey("today")} className="mt-2 inline-flex h-9 items-center gap-2 rounded-md px-1 text-sm font-medium text-muted hover:text-primary"><Plus className="size-4 text-primary" />Add task</button>}
             </div>
           )
