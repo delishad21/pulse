@@ -1,6 +1,6 @@
 import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
+import { Animated, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
 import { PulseApiError } from "@pulse/api-client";
 import { AppText, PrimaryButton, Screen } from "@/components/ui";
 import { AppFont } from "@/constants/fonts";
@@ -18,18 +18,35 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shake] = useState(() => new Animated.Value(0));
 
-  if (auth.status === "authenticated") return <Redirect href="/today" />;
+  if (auth.status === "authenticated") return <Redirect href="/inbox" />;
   if (auth.status === "needs-server") return <Redirect href="/server" />;
+  // Repeated failures produce the same message, so shake it to make each
+  // attempt visibly register.
+  const fail = (message: string) => {
+    setError(message);
+    shake.setValue(0);
+    Animated.sequence([10, -10, 6, -6, 0].map((toValue) => Animated.timing(shake, { toValue, duration: 50, useNativeDriver: true }))).start();
+  };
   const submit = async () => {
+    if (loading) return;
+    // Keep the error message and button visible instead of under the keyboard.
+    Keyboard.dismiss();
+    const trimmedUsername = username.trim();
+    if (!trimmedUsername || !password || (registering && !name.trim())) {
+      fail(registering ? "Enter your name, username, and password." : "Enter your username and password.");
+      return;
+    }
     setLoading(true); setError(null);
     try {
-      if (registering) await auth.register(name, username, password);
-      else await auth.login(username, password);
+      if (registering) await auth.register(name.trim(), trimmedUsername, password);
+      else await auth.login(trimmedUsername, password);
     } catch (value) {
-      setError(value instanceof PulseApiError ? value.message : "Could not connect to Pulse. Check the server address and try again.");
+      fail(value instanceof PulseApiError ? value.message : "Could not connect to Pulse. Check the server address and try again.");
     } finally { setLoading(false); }
   };
+  const edit = (setter: (value: string) => void) => (value: string) => { setter(value); setError(null); };
 
   const inputStyle = [styles.input, { color: palette.text, backgroundColor: palette.surface, borderColor: palette.border }];
   return (
@@ -40,10 +57,10 @@ export default function LoginScreen() {
             <View style={styles.brandRow}><Image source={require("@/assets/images/pulse-logo.png")} resizeMode="contain" style={styles.logoImage} /><AppText style={styles.logo}>Pulse</AppText></View>
             <AppText muted style={styles.subtitle}>Your tasks, everywhere.</AppText>
             <View style={styles.form}>
-              {registering && <TextInput value={name} onChangeText={setName} placeholder="Name" placeholderTextColor={palette.textMuted} style={inputStyle} autoComplete="name" showSoftInputOnFocus={true} />}
-              <TextInput value={username} onChangeText={setUsername} placeholder="Username" placeholderTextColor={palette.textMuted} style={inputStyle} autoCapitalize="none" autoCorrect={false} autoComplete="username" showSoftInputOnFocus={true} />
-              <TextInput value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor={palette.textMuted} style={inputStyle} secureTextEntry autoComplete={registering ? "new-password" : "current-password"} showSoftInputOnFocus={true} onSubmitEditing={submit} />
-              {error && <AppText style={[styles.error, { color: palette.danger }]}>{error}</AppText>}
+              {registering && <TextInput value={name} onChangeText={edit(setName)} placeholder="Name" placeholderTextColor={palette.textMuted} style={inputStyle} autoComplete="name" showSoftInputOnFocus={true} />}
+              <TextInput value={username} onChangeText={edit(setUsername)} placeholder="Username" placeholderTextColor={palette.textMuted} style={inputStyle} autoCapitalize="none" autoCorrect={false} autoComplete="username" showSoftInputOnFocus={true} />
+              <TextInput value={password} onChangeText={edit(setPassword)} placeholder="Password" placeholderTextColor={palette.textMuted} style={inputStyle} secureTextEntry autoComplete={registering ? "new-password" : "current-password"} showSoftInputOnFocus={true} onSubmitEditing={submit} />
+              {error && <Animated.View accessibilityLiveRegion="polite" accessibilityRole="alert" style={{ transform: [{ translateX: shake }] }}><AppText style={[styles.error, { color: palette.danger }]}>{error}</AppText></Animated.View>}
               <PrimaryButton loading={loading} onPress={submit}>{registering ? "Create account" : "Sign in"}</PrimaryButton>
             </View>
             {auth.registrationEnabled && <Pressable onPress={() => { setRegistering((value) => !value); setError(null); }} style={styles.switch}>
