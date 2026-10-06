@@ -6,7 +6,7 @@ import { useAppTheme } from "@/providers/theme-provider";
 export default function HomeScreen() {
   const { status } = useAuth();
   const { palette } = useAppTheme();
-  if (status === "authenticated") return <Redirect href="/today" />;
+  if (status === "authenticated") return <Redirect href="/inbox" />;
   if (status === "needs-server") return <Redirect href="/server" />;
   if (status === "unauthenticated") return <Redirect href="/login" />;
   return (

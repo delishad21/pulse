@@ -29,7 +29,7 @@ export default function WidgetDeepLinkScreen() {
       router.replace(pathname as never);
       return;
     }
-    router.replace("/today");
+    router.replace("/inbox");
   }, [segments, status]);
 
   return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: palette.background }}><ActivityIndicator color={palette.accent} /></View>;
