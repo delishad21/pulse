@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import type { Task } from "@pulse/api-client";
 import { useTaskView } from "@/hooks/use-tasks";
+import { useLinkedTask } from "@/hooks/use-linked-task";
 import { localDateKey, monthGrid, taskDateKey, weekDateLabel, weekDays, startOfCurrentWeek } from "@/lib/task-dates";
 import { cn } from "@/lib/utils";
 import { Shell } from "./shell";
@@ -34,6 +35,8 @@ export function UpcomingCalendar() {
   const [includeProjectTasks, setIncludeProjectTasks] = useState(false);
   const [view, setView] = useState<UpcomingView>("week");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const { linkedTask, clear: clearLinkedTask } = useLinkedTask();
+  const openTask = editingTask ?? linkedTask;
   const [composerDate, setComposerDate] = useState<string | null>(null);
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [weekAnchor, setWeekAnchor] = useState(() => new Date());
@@ -145,7 +148,7 @@ export function UpcomingCalendar() {
           </div>
         )}
       </div>
-      <TaskCreateModal key={editingTask?.id ?? "closed"} open={Boolean(editingTask)} task={editingTask} onClose={() => setEditingTask(null)} />
+      <TaskCreateModal key={openTask?.id ?? "closed"} open={Boolean(openTask)} task={openTask} onClose={() => { setEditingTask(null); clearLinkedTask(); }} />
     </Shell>
   );
 }

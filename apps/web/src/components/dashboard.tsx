@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CheckCircle2, Plus, RotateCcw, RotateCw } from "lucide-react";
 import type { Task } from "@pulse/api-client";
 import { useTasks, useTaskView } from "@/hooks/use-tasks";
+import { useLinkedTask } from "@/hooks/use-linked-task";
 import { useProjects } from "@/hooks/use-projects";
 import { useUndo, useRedo, useHistory } from "@/hooks/use-history";
 import { TaskList } from "./task-list";
@@ -85,6 +86,8 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
   const { data: history } = useHistory();
   const [composerKey, setComposerKey] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const { linkedTask, clear: clearLinkedTask } = useLinkedTask();
+  const openTask = editingTask ?? linkedTask;
 
   const rawFiltered = tasks
     ? (filter.type === "inbox" || filter.type === "today")
@@ -182,7 +185,7 @@ export function Dashboard({ title, filter, header }: DashboardProps) {
           </section>
         )}
       </div>
-      <TaskCreateModal key={editingTask?.id ?? "closed"} open={Boolean(editingTask)} task={editingTask} onClose={() => setEditingTask(null)} />
+      <TaskCreateModal key={openTask?.id ?? "closed"} open={Boolean(openTask)} task={openTask} onClose={() => { setEditingTask(null); clearLinkedTask(); }} />
     </Shell>
   );
 }
