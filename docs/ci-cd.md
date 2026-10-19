@@ -1,26 +1,19 @@
 # Pulse CI/CD
 
 The `Pulse CI/CD` workflow in `.github/workflows/ci.yml` runs the monorepo
-checks, publishes the API, web, MCP, and reminder-worker images to Docker Hub, and builds a signed
-Android APK. A tag such as `v1.0.1` also creates a GitHub Release with the APK
-attached. The home server is updated manually by pulling the `latest` images.
+checks and builds a signed Android APK. A tag such as `v1.0.1` also creates a
+GitHub Release with the APK attached. CI does not publish container images.
 
 ## GitHub configuration
 
 Add these repository secrets under **Settings → Secrets and variables →
 Actions**:
 
-- `DOCKERHUB_USERNAME`: Docker Hub account that owns the `pulse-api`,
-  `pulse-web`, `pulse-mcp`, and `pulse-reminder-worker` repositories.
-- `DOCKERHUB_TOKEN`: a Docker Hub access token with permission to push those
-  repositories.
 - `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
   and `ANDROID_KEY_PASSWORD`: the signing key used for every downloadable APK.
 
-The optional repository variable `DOCKERHUB_NAMESPACE` can be set when the
-Docker Hub namespace differs from the login username. The optional
-mobile development variable `EXPO_PUBLIC_PULSE_API_URL` can prefill the server
-selector while running locally. Production APKs intentionally do not embed a
+The optional mobile development variable `EXPO_PUBLIC_PULSE_API_URL` can
+prefill the server selector while running locally. Production APKs intentionally do not embed a
 server URL: on first launch, the user chooses a Pulse instance and can change
 or disconnect it from the login screen. All credentials remain GitHub secrets
 or server-side environment variables.
@@ -50,18 +43,17 @@ APK (uninstall the debug build once if Android refuses the update).
 The production `compose.yaml` accepts complete image references through
 `PULSE_API_IMAGE`, `PULSE_WEB_IMAGE`, `PULSE_MCP_IMAGE`, and
 `PULSE_REMINDER_WORKER_IMAGE`. In Portainer, set
-these values in the stack environment to the Docker Hub `latest` tags, for
-example:
+these values in the stack environment to the images you deploy, for example:
 
 ```dotenv
-PULSE_API_IMAGE=docker.io/<dockerhub-namespace>/pulse-api:latest
-PULSE_WEB_IMAGE=docker.io/<dockerhub-namespace>/pulse-web:latest
-PULSE_MCP_IMAGE=docker.io/<dockerhub-namespace>/pulse-mcp:latest
-PULSE_REMINDER_WORKER_IMAGE=docker.io/<dockerhub-namespace>/pulse-reminder-worker:latest
+PULSE_API_IMAGE=<registry>/pulse-api:<tag>
+PULSE_WEB_IMAGE=<registry>/pulse-web:<tag>
+PULSE_MCP_IMAGE=<registry>/pulse-mcp:<tag>
+PULSE_REMINDER_WORKER_IMAGE=<registry>/pulse-reminder-worker:<tag>
 PULSE_MCP_HOST_PORT=6061
 ```
 
-After a successful `main` build, use Portainer's **Re-pull image and redeploy**
+After updating the images, use Portainer's **Re-pull image and redeploy**
 action for the `pulse` stack. The MCP service is no longer profile-gated and
 will run continuously alongside the API and web services.
 
@@ -91,11 +83,6 @@ requires the same key as its Hermes bearer token. The API resolves the key to
 its owner; `PULSE_DEFAULT_USERNAME` is no longer used for MCP requests once
 this key is configured. Revoke or rotate the key from Settings if the
 integration host is lost or compromised.
-
-The Docker Hub repositories may be public, in which case the server needs no
-additional setup. For private repositories, log in on the server once with a
-read-only Docker Hub token (`docker login`) and keep that credential on the
-server; it is deliberately not transported through GitHub Actions.
 
 To publish a release and make an APK available for phone updates:
 
