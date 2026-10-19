@@ -1,4 +1,14 @@
-name: pulse
+# Production stack for the home server. devbot deploys it as project "pulse":
+#   REVISION=<commit> docker compose -p pulse build && ... up -d
+# Configuration comes from the server's .env (see deploy/pulse.env.example).
+# The project name, service names, network/volume names and host ports match
+# the former Portainer stack so its data and the nginx site carry over.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
 
 services:
   db:
@@ -10,20 +20,36 @@ services:
       POSTGRES_PASSWORD: ${PULSE_DB_PASSWORD}
     volumes:
       - pulse_postgres:/var/lib/postgresql/data
+    labels:
+      backup: postgres
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pulse -d pulse"]
       interval: 5s
       timeout: 5s
       retries: 20
+    logging: *logging
+    networks: [internal]
+
+  # One-shot: applies pending Prisma migrations before the app starts.
+  migrate:
+    build:
+      context: .
+      target: migrate
+    image: pulse-migrate:${REVISION:-dev}
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://pulse:${PULSE_DB_PASSWORD}@db:5432/pulse
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *logging
     networks: [internal]
 
   api:
     build:
       context: .
       target: api
-    # Set this to a fully-qualified Docker Hub image in production. The local
-    # fallback keeps `docker compose build` useful for development and recovery.
-    image: ${PULSE_API_IMAGE:-pulse-api:local}
+    image: pulse-api:${REVISION:-dev}
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://pulse:${PULSE_DB_PASSWORD}@db:5432/pulse
@@ -42,32 +68,32 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD
         - node
         - -e
-        - fetch('http://127.0.0.1:4000/api/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+        - fetch('http://127.0.0.1:4000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
       interval: 10s
       timeout: 5s
       retries: 12
+    logging: *logging
     networks: [internal]
 
   web:
     build:
       context: .
       target: web
-    # Set this to a fully-qualified Docker Hub image in production. The local
-    # fallback keeps `docker compose build` useful for development and recovery.
-    image: ${PULSE_WEB_IMAGE:-pulse-web:local}
+    image: pulse-web:${REVISION:-dev}
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://pulse:${PULSE_DB_PASSWORD}@db:5432/pulse
       PULSE_API_INTERNAL_URL: http://api:4000
       PULSE_WEB_TOKEN: ${PULSE_WEB_TOKEN}
       AUTH_SECRET: ${AUTH_SECRET}
-      # Set AUTH_URL in the deployment environment to the public Pulse URL.
-      AUTH_URL: ${AUTH_URL:-https://pulse.example.com}
+      AUTH_URL: ${AUTH_URL:-https://pulse.delishad.com}
       PULSE_REGISTRATION_ENABLED: ${PULSE_REGISTRATION_ENABLED:-false}
       PULSE_AUTH_DISABLED: ${PULSE_AUTH_DISABLED:-false}
       NEXT_TELEMETRY_DISABLED: 1
@@ -76,13 +102,25 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      # Also checks the API and database (see apps/web/src/app/api/health).
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 6
+    logging: *logging
     networks: [internal, edge]
 
   mcp:
     build:
       context: .
       target: mcp
-    image: ${PULSE_MCP_IMAGE:-pulse-mcp:local}
+    image: pulse-mcp:${REVISION:-dev}
     restart: unless-stopped
     environment:
       PULSE_API_BASE_URL: http://api:4000
@@ -96,13 +134,24 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:6060/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 6
+    logging: *logging
     networks: [internal, edge]
 
   reminder-worker:
     build:
       context: .
       target: reminder-worker
-    image: ${PULSE_REMINDER_WORKER_IMAGE:-pulse-reminder-worker:local}
+    image: pulse-reminder-worker:${REVISION:-dev}
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://pulse:${PULSE_DB_PASSWORD}@db:5432/pulse
@@ -114,6 +163,7 @@ services:
       PULSE_PUBLIC_URL: ${AUTH_URL:-}
       REMINDER_POLL_INTERVAL_MS: ${REMINDER_POLL_INTERVAL_MS:-5000}
       REMINDER_MAX_ATTEMPTS: ${REMINDER_MAX_ATTEMPTS:-8}
+      REMINDER_HEARTBEAT_FILE: /tmp/pulse-reminder-worker.heartbeat
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
@@ -126,6 +176,18 @@ services:
         condition: service_healthy
       api:
         condition: service_healthy
+    healthcheck:
+      # Healthy while the poll loop keeps completing cycles.
+      test:
+        - CMD
+        - node
+        - -e
+        - const f=process.env.REMINDER_HEARTBEAT_FILE,max=Math.max(60000,3*Number(process.env.REMINDER_POLL_INTERVAL_MS||5000));try{if(Date.now()-require('fs').statSync(f).mtimeMs>max)process.exit(1)}catch{process.exit(1)}
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 4
+    logging: *logging
     networks: [internal, edge]
 
 networks:
@@ -137,5 +199,6 @@ networks:
     internal: true
 
 volumes:
+  # Covered by the db service's nightly pg_dump (backup: postgres).
   pulse_postgres:
     name: pulse_postgres

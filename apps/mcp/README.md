@@ -29,7 +29,7 @@ headers:
 `PULSE_API_TOKEN` is used both to authenticate Hermes at the MCP boundary and
 to authenticate the MCP's requests to Pulse. In a production deployment,
 create a named API key from the Pulse Settings page and provide it to the
-Portainer-managed MCP container. The key is resolved to its owning Pulse user,
+`mcp` service via `PULSE_MCP_API_KEY` (see `deploy/README.md`). The key is resolved to its owning Pulse user,
 so every MCP operation remains scoped to that account.
 
 For local development, run the HTTP server directly:
