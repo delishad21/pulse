@@ -1,14 +1,20 @@
 import "dotenv/config";
+import { writeFile } from "node:fs/promises";
 import { prisma } from "@pulse/db";
 import { processDueReminders } from "./worker.js";
 
 const intervalMs = Math.max(1000, Number(process.env.REMINDER_POLL_INTERVAL_MS ?? 5000));
+// Touched after every successful cycle so the container healthcheck can spot a stalled worker.
+const heartbeatFile = process.env.REMINDER_HEARTBEAT_FILE;
 let stopping = false;
 
 async function run() {
   console.log(`Pulse reminder worker started; interval=${intervalMs}ms`);
   while (!stopping) {
-    try { await processDueReminders(); } catch (error) { console.error("Reminder worker cycle failed", error); }
+    try {
+      await processDueReminders();
+      if (heartbeatFile) await writeFile(heartbeatFile, new Date().toISOString());
+    } catch (error) { console.error("Reminder worker cycle failed", error); }
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
   await prisma.$disconnect();
