@@ -40,27 +40,17 @@ APK (uninstall the debug build once if Android refuses the update).
 
 ## Home-server updates
 
-The production `compose.yaml` accepts complete image references through
-`PULSE_API_IMAGE`, `PULSE_WEB_IMAGE`, `PULSE_MCP_IMAGE`, and
-`PULSE_REMINDER_WORKER_IMAGE`. In Portainer, set
-these values in the stack environment to the images you deploy, for example:
+Container images are not published to a registry. devbot builds them on the
+home server from the committed tree (`devbot deploy pulse`, or `ship <task>`)
+and `devbot rollback pulse` undoes a deploy; see
+[deploy/README.md](../deploy/README.md). The old `PULSE_*_IMAGE` overrides and
+Portainer's **Re-pull image and redeploy** flow are deprecated and ignored.
 
-```dotenv
-PULSE_API_IMAGE=<registry>/pulse-api:<tag>
-PULSE_WEB_IMAGE=<registry>/pulse-web:<tag>
-PULSE_MCP_IMAGE=<registry>/pulse-mcp:<tag>
-PULSE_REMINDER_WORKER_IMAGE=<registry>/pulse-reminder-worker:<tag>
-PULSE_MCP_HOST_PORT=6061
-```
-
-After updating the images, use Portainer's **Re-pull image and redeploy**
-action for the `pulse` stack. The MCP service is no longer profile-gated and
-will run continuously alongside the API and web services.
-
-Reminder delivery additionally uses `HERMES_REMINDER_WEBHOOK_URL`,
-`HERMES_REMINDER_WEBHOOK_SECRET`, `TELEGRAM_FALLBACK_BOT_TOKEN`,
-`TELEGRAM_REMINDER_CHAT_ID`, and `TELEGRAM_REMINDER_THREAD_ID`. Keep these in
-the Portainer stack environment. The fallback token may remain empty until the
+Every server setting is listed in
+[deploy/pulse.env.example](../deploy/pulse.env.example). Reminder delivery uses
+`HERMES_REMINDER_WEBHOOK_URL`, `HERMES_REMINDER_WEBHOOK_SECRET`,
+`TELEGRAM_FALLBACK_BOT_TOKEN`, `TELEGRAM_REMINDER_CHAT_ID`, and
+`TELEGRAM_REMINDER_THREAD_ID`. The fallback token may remain empty until the
 separate bot has been created; Hermes delivery remains available without it.
 Optional email delivery uses `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
 `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM`. Phone notifications use Expo

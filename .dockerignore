@@ -1,5 +1,6 @@
 .git
 .worktrees
+.devbot
 node_modules
 **/node_modules
 **/.next
@@ -8,8 +9,11 @@ node_modules
 **/test-results
 **/playwright-report
 **/.expo
-.env
-.env.*
-!.env.example
+apps/mobile/android
+apps/mobile/ios
+# Never bake env files into an image; secrets come from the server's .env.
+**/.env
+**/.env.*
+!**/.env.example
 .DS_Store
 npm-debug.log*

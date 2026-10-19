@@ -21,11 +21,11 @@
     "bcryptjs": "^3.0.3",
     "dotenv": "^16.6.1",
     "fastify": "^5.12.1",
+    "tsx": "^4",
     "zod": "^3.25.22"
   },
   "devDependencies": {
     "@types/node": "^20",
-    "tsx": "^4",
     "typescript": "^6.0.3"
   }
 }

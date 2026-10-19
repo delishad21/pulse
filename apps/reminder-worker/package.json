@@ -14,12 +14,12 @@
     "@pulse/db": "*",
     "@pulse/domain": "*",
     "dotenv": "^16.6.1",
-    "nodemailer": "^8.0.11"
+    "nodemailer": "^8.0.11",
+    "tsx": "^4"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",
-    "tsx": "^4",
     "typescript": "^6.0.3"
   }
 }
