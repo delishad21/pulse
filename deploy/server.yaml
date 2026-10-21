@@ -1,0 +1,11 @@
+# How pulse sits on the home server (devbot server plan / apply).
+# Written from the hand-made site it replaces (pulse.conf), so adopting changes nothing in behaviour.
+host: pulse.delishad.com
+port: 3210
+websockets: true
+health: /api/health
+exposure: public-sg
+dns: proxied
+auth: app
+teardown:
+  volumes: keep
