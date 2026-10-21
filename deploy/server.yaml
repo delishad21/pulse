@@ -1,0 +1,9 @@
+# How this app sits on the home server: devbot server plan / apply (DEPLOY.md, "Server").
+# exposure: local | public-sg | public-world. Going public needs auth: app | open.
+host: pulse.delishad.com
+port: 3210
+websockets: true
+exposure: public-sg
+dns: proxied
+teardown:
+  volumes: keep
