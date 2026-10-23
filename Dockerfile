@@ -1,7 +1,7 @@
 # One multi-stage build for every Pulse server image; compose picks the target.
 # Build stages get the full workspace; runtime targets get production deps only.
 
-FROM node:22.23.2-bookworm-slim AS os
+FROM node:22.23.4-bookworm-slim AS os
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN apt-get update -y \
