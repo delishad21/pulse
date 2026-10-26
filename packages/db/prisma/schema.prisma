@@ -55,6 +55,7 @@ model User {
   notificationPreference NotificationPreference?
   reminderDeliveries ReminderDelivery[]
   pushDevices   PushDevice[]
+  widgetSyncSignal WidgetSyncSignal?
   createdAt    DateTime    @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime    @updatedAt @db.Timestamptz(3)
 }
@@ -232,6 +233,18 @@ model PushDevice {
   updatedAt  DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([userId, active, lastSeenAt])
+}
+
+/// One row per user whose tasks changed since their phones were last told to
+/// refresh their home-screen widgets. The API upserts it on every mutation;
+/// the reminder worker sends one silent push per user once edits go quiet.
+model WidgetSyncSignal {
+  userId           String   @id
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstRequestedAt DateTime @default(now()) @db.Timestamptz(3)
+  requestedAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([requestedAt])
 }
 
 model ReminderDelivery {

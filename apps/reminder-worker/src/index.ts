@@ -2,6 +2,7 @@ import "dotenv/config";
 import { writeFile } from "node:fs/promises";
 import { prisma } from "@pulse/db";
 import { processDueReminders } from "./worker.js";
+import { processWidgetSyncSignals } from "./widget-sync.js";
 
 const intervalMs = Math.max(1000, Number(process.env.REMINDER_POLL_INTERVAL_MS ?? 5000));
 // Touched after every successful cycle so the container healthcheck can spot a stalled worker.
@@ -13,6 +14,8 @@ async function run() {
   while (!stopping) {
     try {
       await processDueReminders();
+      // A failing widget push must not stall reminders (or the heartbeat).
+      await processWidgetSyncSignals(prisma).catch((error) => console.error("Widget sync cycle failed", error));
       if (heartbeatFile) await writeFile(heartbeatFile, new Date().toISOString());
     } catch (error) { console.error("Reminder worker cycle failed", error); }
     await new Promise((resolve) => setTimeout(resolve, intervalMs));

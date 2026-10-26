@@ -2,7 +2,7 @@ import { formatDateInTimezone, nextRecurrenceDate, nextRecurrenceInstant, recurr
 import type { BulkUpdateInput, CreateTaskInput, UpdateTaskInput } from "@pulse/api-client";
 import { getRepository } from "../repositories/registry.js";
 
-export interface CompletionResult { task: Task; spawnedTask: Task | null; }
+export interface CompletionResult { task: Task; spawnedTask: Task | null; alreadyCompleted?: boolean; }
 export interface BulkCompletionResult { tasks: Task[]; spawnedTasks: Task[]; }
 
 export const listTasks = (userId: UserId, filters: Record<string,string> = {}) => getRepository().tasks.list(userId,{status:filters.status as "open"|"completed"|"cancelled"|undefined,projectId:filters.projectId});
@@ -56,6 +56,9 @@ function nextInput(task: Task, completedAt: Date, timezone: string): CreateTaskI
 
 export async function completeTask(userId:UserId,id:string,timezone:string,completedAt=new Date()):Promise<CompletionResult>{
   const original=await getRepository().tasks.get(userId,id);
+  // Idempotent: phones retry widget ticks until they get an answer, so a
+  // repeat must not complete a recurring task twice or spawn a second copy.
+  if(original.status==="completed")return {task:original,spawnedTask:null,alreadyCompleted:true};
   const task=await getRepository().tasks.complete(userId,id,completedAt);
   const input=nextInput(original,completedAt,timezone);
   const spawnedTask=input?await getRepository().tasks.create(userId,input):null;
