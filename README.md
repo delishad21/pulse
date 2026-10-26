@@ -15,7 +15,7 @@ The goal was to create and maintain a customizable Todoist clone that I could mo
 
 ## Development
 
-Use Node 22.23.2 (`.nvmrc`).
+Use Node 22.23.4 (`.nvmrc`).
 
 ```bash
 nvm use
