@@ -52,6 +52,12 @@ export interface TaskWidgetSnapshot {
   accentColor: string;
   configuration: WidgetConfiguration;
   tasks: WidgetTaskItem[];
+  /**
+   * Tasks ticked in the widget that the server has not confirmed yet. The
+   * widget appends to this when a task is ticked; the app sends each one to
+   * the server and keeps it here (and hidden) until the server confirms.
+   */
+  completedTaskIds?: TaskId[];
 }
 
 /** Kept as an alias for older widget consumers. */

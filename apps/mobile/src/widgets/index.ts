@@ -7,7 +7,11 @@ export const inboxWidget = createWidget<TaskWidgetSnapshot>("PulseInbox", Widget
 export const upcomingWidget = createWidget<TaskWidgetSnapshot>("PulseUpcoming", WidgetLayout);
 export const overdueWidget = createWidget<TaskWidgetSnapshot>("PulseOverdue", WidgetLayout);
 
-interface FlexibleProps { snapshots: Record<Exclude<WidgetView, "project">, TaskWidgetSnapshot>; }
+interface FlexibleProps {
+  snapshots: Record<Exclude<WidgetView, "project">, TaskWidgetSnapshot>;
+  /** Ticks from every instance and view of this widget, until the server confirms them. */
+  completedTaskIds?: string[];
+}
 interface FlexibleConfiguration { view?: Exclude<WidgetView, "project">; showDue?: boolean; showProject?: boolean; }
 
 export const tasksWidget = createWidget<FlexibleProps, FlexibleConfiguration>("PulseTasks", (props, environment) => {
@@ -19,7 +23,11 @@ export const tasksWidget = createWidget<FlexibleProps, FlexibleConfiguration>("P
     tasks: snapshot.tasks.map((task) => ({ ...task, dueLabel: environment.configuration?.showDue === false ? null : task.dueLabel, projectName: environment.configuration?.showProject === false ? null : task.projectName })),
   }, environment, (taskId) => {
     const current = props.snapshots[view] ?? props.snapshots.today;
-    return { ...props, snapshots: { ...props.snapshots, [view]: { ...current, openCount: Math.max(0, current.openCount - 1), totalCount: Math.max(0, current.totalCount - 1), tasks: current.tasks.filter((task) => task.id !== taskId) } } };
+    return {
+      ...props,
+      snapshots: { ...props.snapshots, [view]: { ...current, openCount: Math.max(0, current.openCount - 1), totalCount: Math.max(0, current.totalCount - 1), tasks: current.tasks.filter((task) => task.id !== taskId) } },
+      completedTaskIds: [...(props.completedTaskIds ?? []).filter((id) => id !== taskId), taskId],
+    };
   });
 });
 
