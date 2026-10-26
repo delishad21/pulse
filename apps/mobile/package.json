@@ -1,6 +1,6 @@
 {
   "name": "@pulse/mobile",
-  "main": "expo-router/entry",
+  "main": "index.ts",
   "version": "1.0.5",
   "dependencies": {
     "@expo/ui": "~57.0.12",
@@ -14,6 +14,7 @@
     "@tanstack/react-query-persist-client": "^5.102.1",
     "dotenv": "^16.6.1",
     "expo": "~57.0.14",
+    "expo-background-task": "~57.0.12",
     "expo-constants": "~57.0.12",
     "expo-device": "~57.0.1",
     "expo-font": "~57.0.1",
@@ -27,6 +28,7 @@
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.2",
     "expo-system-ui": "~57.0.2",
+    "expo-task-manager": "~57.0.12",
     "expo-web-browser": "~57.0.2",
     "expo-widgets": "~57.0.11",
     "fastify": "^5.12.1",
@@ -56,7 +58,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node --experimental-strip-types --test src/lib/*.test.ts",
+    "test": "node --experimental-strip-types --test src/lib/*.test.ts src/widgets/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "private": true

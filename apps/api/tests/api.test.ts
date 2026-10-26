@@ -376,3 +376,39 @@ test("bulk update undo restores every task and operation history is capped at th
     await cleanup();
   }
 });
+
+test("completing an already completed recurring task is a no-op", async () => {
+  const { client, cleanup } = await createTestClient();
+  try {
+    const task = await client.createTask({ title: "Water plants", dueDate: "2026-08-19", recurrenceRule: "FREQ=WEEKLY" });
+    await client.completeTask(task.id);
+    const operations = (await client.listOperations()).length;
+    const again = await client.completeTask(task.id);
+    assert.equal(again.status, "completed");
+    assert.equal((await client.listOperations()).length, operations);
+    assert.equal((await client.listTasks()).filter((t) => t.title === "Water plants").length, 2);
+  } finally {
+    await cleanup();
+  }
+});
+
+test("mutations that change widget data notify once per request; reads and comments do not", async () => {
+  const changed: string[] = [];
+  const app = await buildApp({ repository: createMemoryRepository(TEST_USER.id), defaultUser: TEST_USER, onUserDataChanged: (userId) => { changed.push(userId); } });
+  const client = new PulseApiClient({ baseUrl: await app.listen({ port: 0 }) });
+  try {
+    const task = await client.createTask({ title: "Widget visible" });
+    await client.getToday();
+    await client.createComment(task.id, { body: "not shown on widgets" });
+    await client.completeTask(task.id);
+    await client.bulkDelete({ ids: [task.id] });
+    await client.undoLast();
+    await assert.rejects(() => client.completeTask("missing-task"));
+    // onResponse runs after the reply is flushed; give it a tick.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(changed, [TEST_USER.id, TEST_USER.id, TEST_USER.id, TEST_USER.id]);
+  } finally {
+    await app.close();
+    clearRepository();
+  }
+});

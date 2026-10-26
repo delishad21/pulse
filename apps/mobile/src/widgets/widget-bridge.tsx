@@ -1,16 +1,14 @@
 import { useQueryClient } from "@tanstack/react-query";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { addUserInteractionListener } from "expo-widgets";
 import { router } from "expo-router";
 import * as Linking from "expo-linking";
 import { useCallback, useEffect, useRef } from "react";
 import { AppState } from "react-native";
-import { consumeAndroidWidgetCompletions } from "@pulse/android-widgets";
 import type { Project, Task } from "@pulse/api-client";
 import { useAuth } from "@/providers/auth-provider";
-import { consumeIOSWidgetCompletions, syncPulseWidgets } from "./sync";
-
-const PENDING_WIDGET_ACTIONS_KEY = "pulse.pending-widget-completions-v1";
+import { registerWidgetBackgroundTasks } from "./background";
+import { registerWidgetPushDevice } from "./push-device";
+import { recordWidgetCompletion, refreshPulseWidgets } from "./sync";
 
 function targetFromWidgetUrl(url: string): string | null {
   const parsed = Linking.parse(url);
@@ -47,28 +45,23 @@ export function WidgetBridge() {
     }
     const [, action, taskId] = target.match(/^(complete|task):([^?]+)/) ?? [];
     if (action === "complete" && taskId) {
-      await api.completeTask(taskId).catch(() => undefined);
+      // Recorded as pending first, so a failed request is retried later
+      // instead of the task reappearing in the widget.
+      await recordWidgetCompletion(taskId);
+      await refreshPulseWidgets(api, cachedWidgetData()).catch(() => undefined);
       await client.invalidateQueries();
-      await syncPulseWidgets(api, cachedWidgetData()).catch(() => undefined);
       return;
     }
     if (action !== "task" || !taskId) return;
     router.replace({ pathname: "/today", params: { task: taskId, widgetAction } });
   }, [api, cachedWidgetData, client]);
-  const flushWidgetActions = useCallback(async () => {
-    const saved = JSON.parse((await AsyncStorage.getItem(PENDING_WIDGET_ACTIONS_KEY)) ?? "[]") as string[];
-    const ids = [...new Set([...saved, ...(await consumeAndroidWidgetCompletions()), ...(await consumeIOSWidgetCompletions())])];
-    if (!ids.length) return true;
-    const results = await Promise.all(ids.map(async (id) => { try { await api.completeTask(id); return null; } catch { return id; } }));
-    await AsyncStorage.setItem(PENDING_WIDGET_ACTIONS_KEY, JSON.stringify(results.filter((id): id is string => Boolean(id))));
-    await client.invalidateQueries();
-    return results.every((id) => !id);
-  }, [api, client]);
-
   useEffect(() => {
     if (status !== "authenticated") return;
-    const refresh = () => flushWidgetActions().then(() => syncPulseWidgets(api, cachedWidgetData())).catch(() => undefined);
+    const refresh = () => refreshPulseWidgets(api, cachedWidgetData()).then(({ completed }) => completed ? client.invalidateQueries() : undefined).catch(() => undefined);
     refresh();
+    // Keep widgets current while the app is closed (see background.ts).
+    registerWidgetBackgroundTasks().catch(() => undefined);
+    registerWidgetPushDevice(api).catch((error) => console.warn("[widgets] unable to register for widget refresh pushes", error));
     const refreshTimer = setInterval(refresh, 60_000);
     const appState = AppState.addEventListener("change", (state) => { if (state === "active") refresh(); });
     const widget = addUserInteractionListener((event) => { handleTarget(event.target); });
@@ -81,6 +74,6 @@ export function WidgetBridge() {
       Linking.getInitialURL().then((url) => { if (!url) return; const target = targetFromWidgetUrl(url); if (target) handleTarget(target); });
     }
     return () => { clearInterval(refreshTimer); appState.remove(); widget.remove(); links.remove(); };
-  }, [api, cachedWidgetData, flushWidgetActions, handleTarget, status]);
+  }, [api, cachedWidgetData, client, handleTarget, status]);
   return null;
 }

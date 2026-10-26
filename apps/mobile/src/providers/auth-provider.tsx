@@ -1,18 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as SecureStore from "expo-secure-store";
-import { Platform } from "react-native";
 import { PulseApiClient, PulseApiError, type MobileAuthConfig, type MobileUser } from "@pulse/api-client";
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { environmentApiOrigin, normalizeApiOrigin, queryCacheKey } from "@/lib/api-origin";
+import { getStoredSession, SERVER_ORIGIN_KEY, setStoredSession, type StoredSession } from "@/lib/session";
+import { WIDGET_STATE_KEYS } from "@/widgets/storage-keys";
+import { unregisterWidgetPushDevice } from "@/widgets/push-device";
 
-const TOKEN_KEY = "pulse.mobile.session";
-const SERVER_ORIGIN_KEY = "pulse.mobile.server-origin";
-const WIDGET_BASELINES_KEY = "pulse.widget-baselines-v2";
-const PENDING_WIDGET_ACTIONS_KEY = "pulse.pending-widget-completions-v1";
 let mobileAccessToken: string | null = null;
 type AuthStatus = "loading" | "needs-server" | "authenticated" | "unauthenticated";
 
-interface StoredSession { accessToken: string; expiresAt: string; user: MobileUser; }
 interface AuthContextValue {
   api: PulseApiClient;
   status: AuthStatus;
@@ -29,25 +25,13 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-async function getStoredSession(): Promise<string | null> {
-  return Platform.OS === "web" ? AsyncStorage.getItem(TOKEN_KEY) : SecureStore.getItemAsync(TOKEN_KEY);
-}
-
-async function setStoredSession(value: string | null): Promise<void> {
-  if (Platform.OS === "web") {
-    if (value) await AsyncStorage.setItem(TOKEN_KEY, value); else await AsyncStorage.removeItem(TOKEN_KEY);
-  } else if (value) await SecureStore.setItemAsync(TOKEN_KEY, value, { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK });
-  else await SecureStore.deleteItemAsync(TOKEN_KEY);
-}
-
 async function clearServerSession(origin: string | null): Promise<void> {
   mobileAccessToken = null;
   await setStoredSession(null);
   await AsyncStorage.multiRemove([
     "pulse.query-cache",
     origin ? queryCacheKey(origin) : "",
-    WIDGET_BASELINES_KEY,
-    PENDING_WIDGET_ACTIONS_KEY,
+    ...WIDGET_STATE_KEYS,
   ].filter(Boolean));
 }
 
@@ -176,6 +160,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
   };
 
   const logout = async () => {
+    // Stop this phone receiving widget refreshes for the account (best effort,
+    // while the token is still valid).
+    await unregisterWidgetPushDevice(api).catch(() => undefined);
     mobileAccessToken = null;
     setUser(null);
     setStatus("unauthenticated");

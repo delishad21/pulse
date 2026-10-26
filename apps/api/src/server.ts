@@ -5,6 +5,7 @@ import { registerAuth, type AuthOptions } from "./lib/auth.js";
 import { registerErrorHandler } from "./lib/errors.js";
 import { registerRoutes } from "./routes/index.js";
 import { resolveApiKey } from "./services/api-key-service.js";
+import { recordWidgetSyncSignal, registerWidgetSyncHook, type UserDataChangeListener } from "./services/widget-sync-service.js";
 import type { PulseRepository } from "./repositories/types.js";
 
 export interface ServerOptions {
@@ -12,6 +13,8 @@ export interface ServerOptions {
   port?: number;
   defaultUser?: { id: string; username: string; name: string | null; timezone: string };
   auth?: AuthOptions;
+  /** Told about every mutation that can change a user's widgets. Defaults to the database signal when using Prisma. */
+  onUserDataChanged?: UserDataChangeListener;
 }
 
 export async function ensureDefaultUser(): Promise<{ id: string; username: string; name: string | null; timezone: string }> {
@@ -51,6 +54,8 @@ export async function buildApp(options: ServerOptions = {}) {
     resolveApiKey,
   });
   await registerErrorHandler(app);
+  const onUserDataChanged = options.onUserDataChanged ?? (options.repository ? undefined : recordWidgetSyncSignal);
+  if (onUserDataChanged) registerWidgetSyncHook(app, onUserDataChanged);
   await registerRoutes(app);
 
   return app;

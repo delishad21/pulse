@@ -8,6 +8,9 @@ export function WidgetLayout(props: TaskWidgetSnapshot, environment: Pick<Widget
   // The Swift widget renderer serializes this function and evaluates it in an
   // isolated scope. Keep values used by the serialized body local to the
   // function; module-level constants are not available at render time.
+  // A tick is recorded in completedTaskIds (persisted with the timeline in
+  // the App Group) so the app can send it to the server later, even when the
+  // app was not running when the task was ticked.
   const priorityColor = { none: "#96969d", low: "#4a8fe7", medium: "#d7a528", high: "#e2783e", urgent: "#dc4f49" } as const;
   const configuration = props.configuration ?? { theme: "system", backgroundOpacity: 1, density: "comfortable", arrangement: "list" };
   const tasks = props.tasks ?? [];
@@ -41,7 +44,7 @@ export function WidgetLayout(props: TaskWidgetSnapshot, environment: Pick<Widget
         return <VStack key={task.id} alignment="leading" spacing={compact ? 2 : 4}>
           {showHeading && <Text modifiers={[font({ size: 10, weight: "semibold" }), foregroundStyle(task.isOverdue ? "#dc4f49" : muted), lineLimit(1)]}>{task.dateLabel ?? "No date"}</Text>}
           <HStack spacing={7}>
-            <Button target={`complete:${task.id}`} onPress={() => (onComplete ? onComplete(task.id) : { ...props, openCount: Math.max(0, props.openCount - 1), totalCount: Math.max(0, props.totalCount - 1), tasks: tasks.filter((item) => item.id !== task.id) }) as never} modifiers={[buttonStyle("plain"), frame({ width: 20, height: 20, alignment: "center" })]}>
+            <Button target={`complete:${task.id}`} onPress={() => (onComplete ? onComplete(task.id) : { ...props, openCount: Math.max(0, props.openCount - 1), totalCount: Math.max(0, props.totalCount - 1), tasks: tasks.filter((item) => item.id !== task.id), completedTaskIds: [...(props.completedTaskIds ?? []).filter((id) => id !== task.id), task.id] }) as never} modifiers={[buttonStyle("plain"), frame({ width: 20, height: 20, alignment: "center" })]}>
               <Text modifiers={[font({ size: compact ? 11 : 12, weight: "bold" }), foregroundStyle(priorityColor[task.priority])]}>○</Text>
             </Button>
             <Link destination={`pulse://widget/task/${task.id}`}>
