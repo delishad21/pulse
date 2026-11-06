@@ -66,13 +66,15 @@ After deployment, sign in to Pulse and create a named API key under **Settings
 
 ```dotenv
 PULSE_MCP_API_KEY=pulse_replace-with-the-generated-key
+PULSE_MCP_CLIENT_TOKEN=replace-with-openssl-rand-hex-32
 ```
 
 The persistent `pulse-mcp` container serves `http://127.0.0.1:6061/mcp` and
-requires the same key as its Hermes bearer token. The API resolves the key to
-its owner; `PULSE_DEFAULT_USERNAME` is no longer used for MCP requests once
-this key is configured. Revoke or rotate the key from Settings if the
-integration host is lost or compromised.
+requires `PULSE_MCP_CLIENT_TOKEN` as the bearer token from Hermes and other
+clients. Only the MCP holds `PULSE_MCP_API_KEY`, which it uses for its calls to
+the API. The API resolves the key to its owner, so `PULSE_DEFAULT_USERNAME` is
+not used for MCP requests. Compose refuses to start without either value. Revoke
+or rotate the key from Settings if the integration host is lost or compromised.
 
 To publish a release and make an APK available for phone updates:
 

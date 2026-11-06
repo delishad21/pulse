@@ -104,7 +104,7 @@ export function ApiKeyManager() {
                 <input aria-label="Generated API key" readOnly value={created.token} className="min-w-0 flex-1 bg-transparent px-1 font-mono text-xs text-ink outline-none" />
                 <button type="button" onClick={() => void copy()} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-white">{copied ? <Check className="size-4" /> : <Copy className="size-4" />}{copied ? "Copied" : "Copy"}</button>
               </div>
-              <p className="text-xs text-muted">Store it as <code className="font-mono">PULSE_MCP_API_KEY</code> in the Pulse deployment environment, then restart the Hermes MCP connection.</p>
+              <p className="text-xs text-muted">Store it as <code className="font-mono">PULSE_MCP_API_KEY</code> in the Pulse deployment environment, then restart the Pulse MCP service.</p>
             </div>
           </div>
         </div>

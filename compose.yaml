@@ -124,9 +124,12 @@ services:
     restart: unless-stopped
     environment:
       PULSE_API_BASE_URL: http://api:4000
-      # Prefer a user-scoped key created in Settings. The service-token fallback
-      # keeps existing installations working until their first key is configured.
-      PULSE_API_TOKEN: ${PULSE_MCP_API_KEY:-${PULSE_SERVICE_TOKEN}}
+      # Used only for the MCP's calls to the Pulse API: a user-scoped key created in Settings.
+      PULSE_API_TOKEN: ${PULSE_MCP_API_KEY:?Set PULSE_MCP_API_KEY to a key from Pulse Settings → API keys}
+      # Clients authenticate at /mcp with this; it is never a Pulse credential.
+      PULSE_MCP_CLIENT_TOKEN: ${PULSE_MCP_CLIENT_TOKEN:?Set PULSE_MCP_CLIENT_TOKEN to a long random value}
+      # Transition only: also accept the API token at /mcp. Remove once Hermes has moved.
+      PULSE_MCP_ALLOW_API_TOKEN: ${PULSE_MCP_ALLOW_API_TOKEN:-false}
       PULSE_MCP_PORT: 6060
       PULSE_MCP_HOST: 0.0.0.0
     ports:

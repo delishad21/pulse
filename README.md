@@ -54,12 +54,13 @@ that user, add the key to the server's settings file:
 
 ```dotenv
 PULSE_MCP_API_KEY=pulse_replace-with-the-generated-key
+PULSE_MCP_CLIENT_TOKEN=replace-with-openssl-rand-hex-32
 ```
 
-The container receives this value as `PULSE_API_TOKEN`, serves
-`http://127.0.0.1:6061/mcp`, and requires the same bearer key from Hermes.
-Existing installations fall back to `PULSE_SERVICE_TOKEN` until a user key is
-configured.
+The container uses the API key as `PULSE_API_TOKEN` for its calls to the Pulse
+API only. It serves `http://127.0.0.1:6061/mcp` and requires
+`PULSE_MCP_CLIENT_TOKEN` as the bearer token from Hermes and other clients.
+Compose refuses to start without either value.
 
 ## Deployment
 
