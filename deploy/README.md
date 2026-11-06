@@ -16,6 +16,12 @@ Hermes ────────────────────────�
   before `api` starts.
 - Settings and secrets: `~/services/pulse/.env` only (mode 600), linked into
   each release. Every variable is listed in [pulse.env.example](pulse.env.example).
+  Compose refuses to run without `PULSE_MCP_API_KEY` and `PULSE_MCP_CLIENT_TOKEN`,
+  so a deploy missing either stops before it changes anything.
+- MCP tokens: clients send `PULSE_MCP_CLIENT_TOKEN` at `/mcp`; only the MCP holds
+  `PULSE_MCP_API_KEY`, for its calls to the API. Rolling back to a release from
+  before this split makes `/mcp` expect `PULSE_MCP_API_KEY` again, so clients on
+  the client token get 401 until they are moved back or the release is redeployed.
 - Health: `https://pulse.delishad.com/api/health` (web → API → database).
   The MCP serves `http://127.0.0.1:6061/health`.
 - nginx: the server's existing `pulse.conf` keeps working (same port 3210).

@@ -65,4 +65,4 @@ export function createPulseMcpServer(api:PulseMcpApi):McpServer{
   return server;
 }
 
-export function createDefaultPulseApi():PulseApiClient{const baseUrl=process.env.PULSE_API_BASE_URL??"http://127.0.0.1:4000";const token=process.env.PULSE_API_TOKEN??null;return new PulseApiClient({baseUrl,getAccessToken:token?async()=>token:undefined});}
+export function createDefaultPulseApi(apiToken:string):PulseApiClient{const baseUrl=process.env.PULSE_API_BASE_URL??"http://127.0.0.1:4000";return new PulseApiClient({baseUrl,getAccessToken:async()=>apiToken});}

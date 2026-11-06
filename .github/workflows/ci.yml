@@ -59,10 +59,18 @@ jobs:
           PULSE_WEB_TOKEN: ci-only-web-token
           PULSE_SERVICE_TOKEN: ci-only-service-token
           PULSE_MCP_API_KEY: pulse_ci-only-user-api-key
+          PULSE_MCP_CLIENT_TOKEN: ci-only-mcp-client-token
           PULSE_MCP_HOST_PORT: 6061
           AUTH_SECRET: ci-only-auth-secret
           AUTH_URL: https://pulse.example.com
-        run: docker compose -f compose.yaml config --quiet
+        run: |
+          docker compose -f compose.yaml config --quiet
+          for name in PULSE_MCP_API_KEY PULSE_MCP_CLIENT_TOKEN; do
+            if env -u "$name" docker compose -f compose.yaml config --quiet 2>/dev/null; then
+              echo "compose must refuse to start without $name"
+              exit 1
+            fi
+          done
 
   android-apk:
     name: Build signed Android APK
