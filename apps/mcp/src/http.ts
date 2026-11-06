@@ -9,7 +9,6 @@ export interface PulseMcpHttpOptions {
   api?: PulseMcpApi;
   clientToken?: string;
   apiToken?: string;
-  allowApiToken?: boolean;
   host?: string;
   port?: number;
 }
@@ -58,10 +57,6 @@ export function createPulseMcpHttpServer(options: PulseMcpHttpOptions = {}): Ser
   if (clientToken === apiToken || clientToken.startsWith("pulse_")) {
     throw new Error("PULSE_MCP_CLIENT_TOKEN must be its own random value, not a Pulse API key.");
   }
-  // Transition only: remove this setting once no client sends the API token to /mcp.
-  const allowApiToken = options.allowApiToken ?? process.env.PULSE_MCP_ALLOW_API_TOKEN === "true";
-  if (allowApiToken) console.warn("Pulse MCP: PULSE_MCP_ALLOW_API_TOKEN is on, /mcp also accepts the API token.");
-  else console.log("Pulse MCP: /mcp accepts only the client token.");
   const api = options.api ?? createDefaultPulseApi(apiToken);
   const handler = toNodeHandler(
     createMcpHandler(() => createPulseMcpServer(api), { legacy: "stateless" }),
@@ -82,9 +77,7 @@ export function createPulseMcpHttpServer(options: PulseMcpHttpOptions = {}): Ser
     }
 
     const suppliedToken = bearerToken(request);
-    const usedApiToken = allowApiToken && suppliedToken !== null && tokenMatches(suppliedToken, apiToken);
-    if (usedApiToken) console.warn("Pulse MCP: a client authenticated at /mcp with the API token.");
-    if (!suppliedToken || (!usedApiToken && !tokenMatches(suppliedToken, clientToken))) {
+    if (!suppliedToken || !tokenMatches(suppliedToken, clientToken)) {
       response.writeHead(401, { "content-type": "application/json", "www-authenticate": "Bearer" });
       response.end(JSON.stringify({ error: "Unauthorized" }));
       return;

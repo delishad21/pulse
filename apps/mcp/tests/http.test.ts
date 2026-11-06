@@ -27,7 +27,7 @@ async function close(server: TestServer): Promise<void> {
 }
 
 function mcpServer(options: PulseMcpHttpOptions = {}): TestServer {
-  return createPulseMcpHttpServer({ clientToken: CLIENT_TOKEN, apiToken: API_TOKEN, api: {} as PulseMcpApi, allowApiToken: false, ...options });
+  return createPulseMcpHttpServer({ clientToken: CLIENT_TOKEN, apiToken: API_TOKEN, api: {} as PulseMcpApi, ...options });
 }
 
 async function connect(port: number, token: string): Promise<Client> {
@@ -73,51 +73,14 @@ test("refuses a missing or wrong token with 401 and leaves /health open", async 
   }
 });
 
-test("refuses the API token at /mcp while the transition is off", async () => {
-  for (const options of [{ allowApiToken: false }, {}]) {
-    const server = mcpServer(options);
-    const port = await listen(server);
-    try {
-      assert.equal(await statusWithToken(port, API_TOKEN), 401);
-      assert.notEqual(await statusWithToken(port, CLIENT_TOKEN), 401);
-    } finally {
-      await close(server);
-    }
-  }
-});
-
-test("the transition setting is off unless it is exactly true", async () => {
-  const previous = process.env.PULSE_MCP_ALLOW_API_TOKEN;
-  try {
-    for (const [value, expectedAccepted] of [["false", false], ["1", false], ["", false], ["true", true]] as const) {
-      process.env.PULSE_MCP_ALLOW_API_TOKEN = value;
-      const server = createPulseMcpHttpServer({ clientToken: CLIENT_TOKEN, apiToken: API_TOKEN, api: {} as PulseMcpApi });
-      const port = await listen(server);
-      try {
-        assert.equal((await statusWithToken(port, API_TOKEN)) !== 401, expectedAccepted, `value ${JSON.stringify(value)}`);
-      } finally {
-        await close(server);
-      }
-    }
-  } finally {
-    if (previous === undefined) delete process.env.PULSE_MCP_ALLOW_API_TOKEN;
-    else process.env.PULSE_MCP_ALLOW_API_TOKEN = previous;
-  }
-});
-
-test("accepts both tokens at /mcp during the transition", async () => {
-  const server = mcpServer({ allowApiToken: true });
+test("refuses the API token at /mcp", async () => {
+  const server = mcpServer();
   const port = await listen(server);
-  const oldClient = await connect(port, API_TOKEN);
-  const newClient = await connect(port, CLIENT_TOKEN);
 
   try {
-    assert.equal((await oldClient.listTools()).tools.length, 26);
-    assert.equal((await newClient.listTools()).tools.length, 26);
-    assert.equal(await statusWithToken(port, "wrong-token"), 401);
+    assert.equal(await statusWithToken(port, API_TOKEN), 401);
+    assert.notEqual(await statusWithToken(port, CLIENT_TOKEN), 401);
   } finally {
-    await oldClient.close();
-    await newClient.close();
     await close(server);
   }
 });
@@ -132,7 +95,7 @@ test("calls the Pulse API only with the API token", async () => {
   const apiPort = await listen(pulseApi);
   const previous = process.env.PULSE_API_BASE_URL;
   process.env.PULSE_API_BASE_URL = `http://127.0.0.1:${apiPort}`;
-  const server = createPulseMcpHttpServer({ clientToken: CLIENT_TOKEN, apiToken: API_TOKEN, allowApiToken: false });
+  const server = createPulseMcpHttpServer({ clientToken: CLIENT_TOKEN, apiToken: API_TOKEN });
   const port = await listen(server);
   const client = await connect(port, CLIENT_TOKEN);
 
