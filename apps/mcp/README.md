@@ -40,11 +40,6 @@ The server uses two separate tokens:
 The server exits at start-up if either token is missing, and Compose refuses to
 start the stack without them. There is no fallback to `PULSE_SERVICE_TOKEN`.
 
-`PULSE_MCP_ALLOW_API_TOKEN=true` is a temporary setting that also accepts the API
-token at `/mcp`, so a client can move to the client token without an outage. It
-is off unless set to exactly `true`. While it is on, the server logs a warning at
-start-up and on each request that uses the old path.
-
 For local development, run the HTTP server directly:
 
 ```bash
