@@ -3,6 +3,10 @@
 host: pulse.delishad.com
 port: 3210
 websockets: true
+login_paths:
+  - /api/auth/callback/credentials
+  - /api/mobile-auth/login
+  - /api/register
 exposure: public-sg
 dns: proxied
 teardown:
