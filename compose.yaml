@@ -24,9 +24,13 @@ services:
       backup: postgres
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pulse -d pulse"]
-      interval: 5s
+      # 30s steady-state checks keep dockerd's exec load down; start_interval
+      # still probes every 2s during start_period so dependents start quickly.
+      interval: 30s
       timeout: 5s
-      retries: 20
+      start_period: 60s
+      start_interval: 2s
+      retries: 3
     logging: *logging
     networks: [internal]
 
@@ -76,9 +80,11 @@ services:
         - node
         - -e
         - fetch('http://127.0.0.1:4000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
-      interval: 10s
+      interval: 30s
       timeout: 5s
-      retries: 12
+      start_period: 120s
+      start_interval: 2s
+      retries: 3
     logging: *logging
     networks: [internal]
 
@@ -109,10 +115,11 @@ services:
         - node
         - -e
         - fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
-      interval: 10s
+      interval: 30s
       timeout: 5s
       start_period: 30s
-      retries: 6
+      start_interval: 2s
+      retries: 3
     logging: *logging
     networks: [internal, edge]
 
@@ -141,10 +148,11 @@ services:
         - node
         - -e
         - fetch('http://127.0.0.1:6060/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
-      interval: 10s
+      interval: 30s
       timeout: 5s
       start_period: 20s
-      retries: 6
+      start_interval: 2s
+      retries: 3
     logging: *logging
     networks: [internal, edge]
 
@@ -184,10 +192,11 @@ services:
         - node
         - -e
         - const f=process.env.REMINDER_HEARTBEAT_FILE,max=Math.max(60000,3*Number(process.env.REMINDER_POLL_INTERVAL_MS||5000));try{if(Date.now()-require('fs').statSync(f).mtimeMs>max)process.exit(1)}catch{process.exit(1)}
-      interval: 15s
+      interval: 30s
       timeout: 5s
       start_period: 30s
-      retries: 4
+      start_interval: 5s
+      retries: 3
     logging: *logging
     networks: [internal, edge]
 
