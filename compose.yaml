@@ -128,8 +128,6 @@ services:
       PULSE_API_TOKEN: ${PULSE_MCP_API_KEY:?Set PULSE_MCP_API_KEY to a key from Pulse Settings → API keys}
       # Clients authenticate at /mcp with this; it is never a Pulse credential.
       PULSE_MCP_CLIENT_TOKEN: ${PULSE_MCP_CLIENT_TOKEN:?Set PULSE_MCP_CLIENT_TOKEN to a long random value}
-      # Transition only: also accept the API token at /mcp. Remove once Hermes has moved.
-      PULSE_MCP_ALLOW_API_TOKEN: ${PULSE_MCP_ALLOW_API_TOKEN:-false}
       PULSE_MCP_PORT: 6060
       PULSE_MCP_HOST: 0.0.0.0
     ports:
