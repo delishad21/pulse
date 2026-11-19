@@ -85,8 +85,13 @@ services:
       start_period: 120s
       start_interval: 2s
       retries: 3
+    # Loopback only, for host-side callers that bring their own Pulse API key
+    # (twee's task cards). Docker publishes no ports for a container that is
+    # only on an internal network, so the API also joins edge.
+    ports:
+      - "127.0.0.1:${PULSE_API_HOST_PORT:-4010}:4000"
     logging: *logging
-    networks: [internal]
+    networks: [internal, edge]
 
   web:
     build:

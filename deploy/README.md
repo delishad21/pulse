@@ -3,6 +3,7 @@
 ```
 browser ──HTTPS──▶ nginx :443 (pulse.delishad.com) ──▶ 127.0.0.1:3210 web (Next.js) ──▶ api ──▶ db (Postgres, volume pulse_postgres)
 Hermes ──────────────────────────────────────────────▶ 127.0.0.1:6061 mcp ──▶ api        reminder-worker ──▶ db, Hermes/Telegram/SMTP/Expo
+twee ────────────────────────────────────────────────▶ 127.0.0.1:4010 api (Bearer <Pulse API key>)
 ```
 
 **Deploying:** say `ship <task>` or run `devbot deploy pulse`; `devbot rollback pulse` undoes it.
@@ -23,7 +24,11 @@ Hermes ────────────────────────�
   before this split makes `/mcp` expect `PULSE_MCP_API_KEY` again, so clients on
   the client token get 401 until they are moved back or the release is redeployed.
 - Health: `https://pulse.delishad.com/api/health` (web → API → database).
-  The MCP serves `http://127.0.0.1:6061/health`.
+  The MCP serves `http://127.0.0.1:6061/health`; the API serves
+  `http://127.0.0.1:4010/api/health/ready`.
+- API on loopback: `127.0.0.1:4010` (`PULSE_API_HOST_PORT`) is for host-side
+  callers like twee. Every route except `/api/health` needs a Bearer token; give
+  each caller its own key from Pulse Settings → API keys.
 - nginx: the server's existing `pulse.conf` keeps working (same port 3210).
   [nginx/pulse.conf](nginx/pulse.conf) is the reference copy, using the shared
   `*.delishad.com` certificate.
